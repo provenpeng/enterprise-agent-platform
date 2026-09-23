@@ -102,7 +102,11 @@ async def upload_document(
     upload: UploadFile,
     settings: Settings,
 ) -> Document:
-    if await db.get(KnowledgeBase, knowledge_base_id) is None:
+    knowledge_base = await db.scalar(
+        select(KnowledgeBase.id).where(KnowledgeBase.id == knowledge_base_id)
+    )
+    await db.rollback()
+    if knowledge_base is None:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
 
     filename, extension, file_type, checksum = await _inspect_upload(
@@ -114,22 +118,19 @@ async def upload_document(
             Document.checksum == checksum,
         )
     )
+    await db.rollback()
     if duplicate is not None:
         raise HTTPException(status_code=409, detail="Document with the same checksum already exists")
 
     document_id = uuid.uuid4()
-    destination = (
-        settings.upload_dir.resolve()
-        / str(knowledge_base_id)
-        / str(document_id)
-        / f"original{extension}"
-    )
+    storage_key = f"{knowledge_base_id}/{document_id}/original{extension}"
+    destination = settings.upload_dir.resolve() / storage_key
     document = Document(
         id=document_id,
         knowledge_base_id=knowledge_base_id,
         filename=filename,
         file_type=file_type,
-        storage_uri=destination.as_uri(),
+        storage_uri=storage_key,
         checksum=checksum,
         status=DocumentStatus.UPLOADED,
         active_index_version=None,
@@ -146,12 +147,15 @@ async def upload_document(
             await db.commit()
         except IntegrityError as exc:
             await db.rollback()
-            duplicate = await db.scalar(
-                select(Document.id).where(
-                    Document.knowledge_base_id == knowledge_base_id,
-                    Document.checksum == checksum,
+            try:
+                duplicate = await db.scalar(
+                    select(Document.id).where(
+                        Document.knowledge_base_id == knowledge_base_id,
+                        Document.checksum == checksum,
+                    )
                 )
-            )
+            finally:
+                await db.rollback()
             if duplicate is not None:
                 raise HTTPException(
                     status_code=409,

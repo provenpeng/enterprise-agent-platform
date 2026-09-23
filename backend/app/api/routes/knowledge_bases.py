@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,9 +32,14 @@ async def create_knowledge_base(
 @router.get("", response_model=list[KnowledgeBaseRead])
 async def list_knowledge_bases(
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[KnowledgeBase]:
     result = await db.scalars(
-        select(KnowledgeBase).order_by(KnowledgeBase.created_at.desc(), KnowledgeBase.id.desc())
+        select(KnowledgeBase)
+        .order_by(KnowledgeBase.created_at.desc(), KnowledgeBase.id.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result)
 

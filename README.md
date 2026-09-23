@@ -55,6 +55,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/doc
 
 上传支持 PDF、Markdown 和 TXT，默认上限为 10 MiB（可通过 `MAX_UPLOAD_SIZE_BYTES` 调整）。原文件保存在根目录 `data/uploads/`，该目录不会提交到 Git。同一知识库内上传相同内容会返回 HTTP 409；成功登记的文档状态为 `UPLOADED`，活动索引版本为空。
 
+知识库和文档列表接口均支持 `limit`、`offset` 查询参数，默认返回 20 条，`limit` 最大为 100。数据库中的 `storage_uri` 保存相对于 `data/uploads/` 的文件 key，API 响应不公开服务器文件路径。
+
 停止数据库容器可在仓库根目录运行 `docker compose down`，此命令会保留数据库命名卷。
 
 ## 配置

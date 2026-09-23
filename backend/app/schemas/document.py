@@ -13,7 +13,6 @@ class DocumentRead(BaseModel):
     knowledge_base_id: uuid.UUID
     filename: str
     file_type: str
-    storage_uri: str
     checksum: str
     status: DocumentStatus
     active_index_version: int | None

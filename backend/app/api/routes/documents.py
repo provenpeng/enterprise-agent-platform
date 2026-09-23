@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,8 @@ async def upload_knowledge_base_document(
 async def list_knowledge_base_documents(
     knowledge_base_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[Document]:
     if await db.get(KnowledgeBase, knowledge_base_id) is None:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
@@ -42,6 +44,8 @@ async def list_knowledge_base_documents(
         select(Document)
         .where(Document.knowledge_base_id == knowledge_base_id)
         .order_by(Document.created_at.desc(), Document.id.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result)
 

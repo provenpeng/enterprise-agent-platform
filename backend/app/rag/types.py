@@ -9,6 +9,7 @@ class ParsedBlock:
     order: int
     heading_level: int | None = None
     section_path: tuple[str, ...] = ()
+    page_number: int | None = None
 
 
 @dataclass
@@ -24,3 +25,4 @@ class ChunkCandidate:
     token_count: int
     block_start: int | None
     block_end: int | None
+    page_number: int | None = None

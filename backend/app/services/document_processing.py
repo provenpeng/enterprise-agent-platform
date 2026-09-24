@@ -13,7 +13,7 @@ def document_processor_from_settings(
     target_tokens: int,
     max_tokens: int,
     token_counter: Callable[[str], int],
-) -> DocumentProcessor:
+) -> DocumentProcessor[str] | DocumentProcessor[bytes]:
     return create_document_processor(
         backend=settings.document_processing_backend,
         file_type=file_type,

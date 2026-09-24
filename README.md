@@ -2,7 +2,7 @@
 
 面向企业知识检索与业务诊断的 AI Agent 平台。产品目标见 [产品规格](docs/PRODUCT_SPEC.md)。
 
-目前已提供 FastAPI 应用、PostgreSQL 数据模型与 Alembic 迁移、知识库创建与查询、原始文档上传与登记、TXT/Markdown 解析与分片，以及数据库连通性健康检查。上传后的自动处理、PDF 解析、向量化、检索、对话和 Agent 功能尚未实现。
+目前已提供 FastAPI 应用、PostgreSQL 数据模型与 Alembic 迁移、知识库创建与查询、原始文档上传与登记、TXT/Markdown/PDF 文本解析与分片，以及数据库连通性健康检查。上传后的自动处理、向量化、检索、对话和 Agent 功能尚未实现。
 
 ## 环境要求
 
@@ -65,10 +65,11 @@ curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/doc
 
 ### 文档处理实现切换
 
-`DOCUMENT_PROCESSING_BACKEND` 可设为 `manual`（默认）或 `langchain`。两种实现通过同一个 `DocumentProcessor` 接口输出 `ParsedDocument` 和 `ChunkCandidate`，供后续索引流程使用。TXT/Markdown 均支持两种模式；PDF 当前仅能上传，解析尚未实现，处理入口会明确报错。上传接口目前只登记原文件，不会自动调用处理入口。
+`DOCUMENT_PROCESSING_BACKEND` 可设为 `manual`（默认）或 `langchain`。两种实现通过同一个 `DocumentProcessor` 接口输出 `ParsedDocument` 和 `ChunkCandidate`，供后续索引流程使用。TXT/Markdown 处理器接收文本字符串，PDF 处理器接收原始文件字节。上传接口目前只登记原文件，不会自动调用处理入口。
 
 - `manual` 使用项目内的 TXT/Markdown 解析器及结构感知分片器。
 - `langchain` 使用 LangChain 的 Markdown 标题分割器和递归文本分割器；TXT 无标题结构，以 LangChain `Document` 交给递归分割器。
+- PDF 在两种模式下均由 pypdf 提取页面文本，再使用所选模式的文本解析与分片实现。分片保留页码；扫描件没有可提取文本时会明确报错，目前不提供 OCR。
 
 切换实现只需修改 `.env` 后重启应用。索引流程接入时应通过 `document_processor_from_settings` 创建处理器，不直接依赖具体解析器。两种实现保持相同输出类型与来源字段，但分片边界可能不同，后续需要用评测集比较检索效果。
 

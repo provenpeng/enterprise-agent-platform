@@ -28,7 +28,11 @@ class LangChainChunker:
         source_documents = [
             Document(
                 page_content=block.text,
-                metadata={"section_path": block.section_path, "block_order": block.order},
+                metadata={
+                    "section_path": block.section_path,
+                    "block_order": block.order,
+                    "page_number": block.page_number,
+                },
             )
             for block in document.blocks
             if block.block_type == "paragraph" and block.text.strip()
@@ -47,6 +51,7 @@ class LangChainChunker:
                     token_count=count,
                     block_start=order,
                     block_end=order,
+                    page_number=part.metadata["page_number"],
                 )
             )
         return chunks

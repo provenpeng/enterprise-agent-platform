@@ -81,7 +81,7 @@ def test_unsupported_format_fails_explicitly() -> None:
     with pytest.raises(ValueError, match="not available"):
         create_document_processor(
             backend="langchain",
-            file_type="application/pdf",
+            file_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             target_tokens=5,
             max_tokens=10,
             token_counter=len,

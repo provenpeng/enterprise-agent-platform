@@ -99,6 +99,8 @@ async def list_document_index_jobs(
 async def list_active_document_chunks(
     document_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ActiveChunkRead]:
     document = await db.get(Document, document_id)
     if document is None:
@@ -112,6 +114,8 @@ async def list_active_document_chunks(
             Chunk.index_version == document.active_index_version,
         )
         .order_by(Chunk.chunk_index)
+        .limit(limit)
+        .offset(offset)
     )
     return [
         ActiveChunkRead(

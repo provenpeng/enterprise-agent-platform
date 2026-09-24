@@ -68,6 +68,7 @@ async def test_upload_enqueues_and_worker_publishes_active_index(api_client) -> 
     assert len(chunks) == 1
     assert chunks[0]["section_path"] == ["Refunds"]
     assert chunks[0]["content"] == "Refunds require approval."
+    assert (await client.get(f"/api/v1/documents/{document_id}/chunks?limit=0")).status_code == 422
     async with sessions() as db:
         chunk = await db.scalar(select(Chunk).where(Chunk.document_id == uuid.UUID(document_id)))
         assert chunk is not None

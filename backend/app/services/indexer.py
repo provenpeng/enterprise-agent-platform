@@ -130,6 +130,8 @@ def _read_source(settings: Settings, claim: ClaimedJob) -> bytes:
         source.relative_to(root)
     except ValueError as exc:
         raise ValueError("Document storage key escapes upload directory") from exc
+    if source.stat().st_size > settings.max_upload_size_bytes:
+        raise ValueError("Original document exceeds upload size limit")
     data = source.read_bytes()
     if hashlib.sha256(data).hexdigest() != claim.checksum:
         raise ValueError("Original document checksum does not match")

@@ -1,67 +1,18 @@
 import hashlib
 import uuid
-from collections.abc import AsyncIterator
 from io import BytesIO
 from pathlib import Path
 
-import httpx
 import pytest
-import pytest_asyncio
 from fastapi import UploadFile
 from sqlalchemy import select, text
-from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from starlette.datastructures import Headers
 
-from app.core.config import Settings, get_settings
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import app
 from app.models.document import Document, DocumentStatus
+from app.models.index_job import IndexJob
 from app.services import document as document_service
 from app.services.document import upload_document
-
-
-@pytest_asyncio.fixture
-async def api_client(
-    tmp_path: Path,
-) -> AsyncIterator[tuple[httpx.AsyncClient, AsyncEngine, async_sessionmaker, Settings]]:
-    database_url = make_url(get_settings().database_url)
-    test_database_name = f"eap_test_{uuid.uuid4().hex}"
-    admin_engine = create_async_engine(
-        database_url.set(database="postgres"), isolation_level="AUTOCOMMIT"
-    )
-    async with admin_engine.connect() as connection:
-        await connection.execute(text(f'CREATE DATABASE "{test_database_name}"'))
-
-    test_database_url = database_url.set(database=test_database_name)
-    test_engine = create_async_engine(test_database_url)
-    session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
-    settings = Settings(
-        database_url=test_database_url.render_as_string(hide_password=False),
-        upload_dir=tmp_path / "uploads",
-    )
-
-    async def override_db() -> AsyncIterator:
-        async with session_factory() as session:
-            yield session
-
-    try:
-        async with test_engine.begin() as connection:
-            await connection.run_sync(Base.metadata.create_all)
-        app.dependency_overrides[get_db] = override_db
-        app.dependency_overrides[get_settings] = lambda: settings
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            yield client, test_engine, session_factory, settings
-    finally:
-        app.dependency_overrides.clear()
-        await test_engine.dispose()
-        async with admin_engine.connect() as connection:
-            await connection.execute(text(f'DROP DATABASE "{test_database_name}"'))
-        await admin_engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -268,3 +219,4 @@ async def test_database_failure_removes_saved_file(api_client) -> None:
     assert not list(settings.upload_dir.rglob("*"))
     async with session_factory() as session:
         assert (await session.scalars(select(Document))).all() == []
+        assert (await session.scalars(select(IndexJob))).all() == []

@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     database_url: str
     upload_dir: Path = ROOT_DIR / "data" / "uploads"
     max_upload_size_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    document_processing_backend: Literal["manual", "langchain"] = "manual"
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",

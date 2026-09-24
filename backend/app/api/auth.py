@@ -1,4 +1,4 @@
-"""Verify externally issued JWTs and scope resources to their owner."""
+"""Verify externally issued JWTs and scope resources to their tenant."""
 
 from dataclasses import dataclass
 from functools import lru_cache
@@ -15,14 +15,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.models.document import Document
 from app.models.knowledge_base import KnowledgeBase
+from app.models.tenant import Tenant
 
 
 bearer = HTTPBearer(auto_error=False)
+LEGACY_TENANT_ID = uuid.uuid5(
+    uuid.NAMESPACE_URL, "enterprise-agent-platform:legacy-unassigned"
+)
 
 
 @dataclass(frozen=True)
 class Principal:
     subject: str
+    tenant_id: uuid.UUID
+    role: str
 
 
 @lru_cache
@@ -57,7 +63,9 @@ async def get_principal(
             algorithms=["RS256"],
             issuer=settings.auth_issuer,
             audience=settings.auth_audience,
-            options={"require": ["sub", "iss", "aud", "iat", "exp"]},
+            options={
+                "require": ["sub", "iss", "aud", "iat", "exp", "tenant_id", "role"]
+            },
         )
     except jwt.PyJWTError as exc:
         raise _unauthorized() from exc
@@ -69,16 +77,42 @@ async def get_principal(
         or subject == "legacy-unassigned"
     ):
         raise _unauthorized()
-    return Principal(subject=subject)
+    try:
+        tenant_id = uuid.UUID(claims["tenant_id"])
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise _unauthorized() from exc
+    role = claims["role"]
+    if (
+        tenant_id.int == 0
+        or tenant_id == LEGACY_TENANT_ID
+        or not isinstance(role, str)
+        or role not in {"admin", "viewer"}
+    ):
+        raise _unauthorized()
+    return Principal(subject=subject, tenant_id=tenant_id, role=role)
 
 
-async def owned_knowledge_base(
+def require_admin(principal: Principal) -> None:
+    if principal.role != "admin":
+        raise HTTPException(
+            status_code=403, detail="Tenant administrator role required"
+        )
+
+
+async def current_tenant(db: AsyncSession, principal: Principal) -> Tenant:
+    tenant = await db.get(Tenant, principal.tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant
+
+
+async def tenant_knowledge_base(
     db: AsyncSession, knowledge_base_id: uuid.UUID, principal: Principal
 ) -> KnowledgeBase:
     knowledge_base = await db.scalar(
         select(KnowledgeBase).where(
             KnowledgeBase.id == knowledge_base_id,
-            KnowledgeBase.owner_sub == principal.subject,
+            KnowledgeBase.tenant_id == principal.tenant_id,
         )
     )
     if knowledge_base is None:
@@ -86,13 +120,15 @@ async def owned_knowledge_base(
     return knowledge_base
 
 
-async def owned_document(
+async def tenant_document(
     db: AsyncSession, document_id: uuid.UUID, principal: Principal
 ) -> Document:
     document = await db.scalar(
         select(Document)
         .join(KnowledgeBase)
-        .where(Document.id == document_id, KnowledgeBase.owner_sub == principal.subject)
+        .where(
+            Document.id == document_id, KnowledgeBase.tenant_id == principal.tenant_id
+        )
     )
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")

@@ -5,7 +5,13 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import Principal, get_principal, owned_document, owned_knowledge_base
+from app.api.auth import (
+    Principal,
+    get_principal,
+    require_admin,
+    tenant_document,
+    tenant_knowledge_base,
+)
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.document import Document
@@ -34,7 +40,8 @@ async def upload_knowledge_base_document(
     settings: Annotated[Settings, Depends(get_settings)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> Document:
-    await owned_knowledge_base(db, knowledge_base_id, principal)
+    require_admin(principal)
+    await tenant_knowledge_base(db, knowledge_base_id, principal)
     return await upload_document(db, knowledge_base_id, file, settings)
 
 
@@ -46,7 +53,7 @@ async def list_knowledge_base_documents(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[Document]:
-    await owned_knowledge_base(db, knowledge_base_id, principal)
+    await tenant_knowledge_base(db, knowledge_base_id, principal)
     result = await db.scalars(
         select(Document)
         .where(Document.knowledge_base_id == knowledge_base_id)
@@ -63,7 +70,7 @@ async def get_document(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> Document:
-    return await owned_document(db, document_id, principal)
+    return await tenant_document(db, document_id, principal)
 
 
 @documents_router.post(
@@ -77,7 +84,8 @@ async def reindex_document(
     settings: Annotated[Settings, Depends(get_settings)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> IndexJob:
-    await owned_document(db, document_id, principal)
+    require_admin(principal)
+    await tenant_document(db, document_id, principal)
     return await enqueue_reindex(db, document_id, settings)
 
 
@@ -87,7 +95,7 @@ async def list_document_index_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> list[IndexJob]:
-    await owned_document(db, document_id, principal)
+    await tenant_document(db, document_id, principal)
     result = await db.scalars(
         select(IndexJob)
         .where(IndexJob.document_id == document_id)
@@ -105,7 +113,7 @@ async def list_active_document_chunks(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ActiveChunkRead]:
-    document = await owned_document(db, document_id, principal)
+    document = await tenant_document(db, document_id, principal)
     if document.active_index_version is None:
         return []
     chunks = await db.scalars(

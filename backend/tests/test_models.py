@@ -6,7 +6,11 @@ from app.models import Chunk, Document, DocumentStatus, IndexJob
 
 def test_domain_tables_and_cascading_foreign_keys() -> None:
     assert set(Base.metadata.tables) == {
-        "knowledge_bases", "documents", "chunks", "document_index_jobs"
+        "tenants",
+        "knowledge_bases",
+        "documents",
+        "chunks",
+        "document_index_jobs",
     }
     assert next(iter(Document.__table__.foreign_keys)).ondelete == "CASCADE"
     assert next(iter(Chunk.__table__.foreign_keys)).ondelete == "CASCADE"

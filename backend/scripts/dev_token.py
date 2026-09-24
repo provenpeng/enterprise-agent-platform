@@ -5,6 +5,7 @@ import base64
 import json
 import subprocess
 import time
+import uuid
 from pathlib import Path
 
 
@@ -15,6 +16,8 @@ def base64url(data: bytes) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--subject", required=True)
+    parser.add_argument("--tenant-id", type=uuid.UUID, required=True)
+    parser.add_argument("--role", choices=["admin", "viewer"], default="admin")
     parser.add_argument(
         "--private-key", type=Path, default=Path("config/auth-private.pem")
     )
@@ -27,6 +30,8 @@ def main() -> None:
     )
     claims = {
         "sub": args.subject,
+        "tenant_id": str(args.tenant_id),
+        "role": args.role,
         "iss": args.issuer,
         "aud": args.audience,
         "iat": now,

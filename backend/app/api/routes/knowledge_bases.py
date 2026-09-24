@@ -6,7 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import Principal, get_principal, owned_knowledge_base
+from app.api.auth import (
+    Principal,
+    current_tenant,
+    get_principal,
+    require_admin,
+    tenant_knowledge_base,
+)
 from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
 from app.schemas.knowledge_base import KnowledgeBaseCreate, KnowledgeBaseRead
@@ -21,8 +27,13 @@ async def create_knowledge_base(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> KnowledgeBase:
+    require_admin(principal)
+    await current_tenant(db, principal)
     knowledge_base = KnowledgeBase(
-        name=payload.name, description=payload.description, owner_sub=principal.subject
+        name=payload.name,
+        description=payload.description,
+        owner_sub=principal.subject,
+        tenant_id=principal.tenant_id,
     )
     db.add(knowledge_base)
     try:
@@ -44,7 +55,7 @@ async def list_knowledge_bases(
 ) -> list[KnowledgeBase]:
     result = await db.scalars(
         select(KnowledgeBase)
-        .where(KnowledgeBase.owner_sub == principal.subject)
+        .where(KnowledgeBase.tenant_id == principal.tenant_id)
         .order_by(KnowledgeBase.created_at.desc(), KnowledgeBase.id.desc())
         .limit(limit)
         .offset(offset)
@@ -58,4 +69,4 @@ async def get_knowledge_base(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> KnowledgeBase:
-    return await owned_knowledge_base(db, knowledge_base_id, principal)
+    return await tenant_knowledge_base(db, knowledge_base_id, principal)

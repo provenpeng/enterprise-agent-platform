@@ -22,6 +22,7 @@ from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.models.tenant import Tenant
 
 
 @lru_cache
@@ -42,6 +43,10 @@ def make_token(subject: str, **overrides: object) -> str:
     now = datetime.now(timezone.utc)
     claims = {
         "sub": subject,
+        "tenant_id": str(
+            uuid.uuid5(uuid.NAMESPACE_URL, f"enterprise-agent-platform:{subject}")
+        ),
+        "role": "admin",
         "iss": "enterprise-agent-platform",
         "aud": "enterprise-agent-api",
         "iat": now,
@@ -83,6 +88,16 @@ async def api_client(
         async with test_engine.begin() as connection:
             await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             await connection.run_sync(Base.metadata.create_all)
+        async with session_factory() as session:
+            session.add(
+                Tenant(
+                    id=uuid.uuid5(
+                        uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+                    ),
+                    name="Test tenant",
+                )
+            )
+            await session.commit()
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_settings] = lambda: settings
         async with httpx.AsyncClient(

@@ -27,5 +27,9 @@ class PayloadTooLarge(ServiceError):
     pass
 
 
+class UpstreamUnavailable(ServiceError):
+    pass
+
+
 class PermanentIndexError(Exception):
     """Input or saved job configuration cannot succeed on retry."""

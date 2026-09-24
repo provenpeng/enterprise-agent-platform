@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.db.session import get_db
 from app.models.document import Document
 from app.models.knowledge_base import KnowledgeBase
 from app.models.tenant import Tenant
@@ -118,6 +119,14 @@ async def tenant_knowledge_base(
     if knowledge_base is None:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return knowledge_base
+
+
+async def authorized_knowledge_base(
+    knowledge_base_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+) -> KnowledgeBase:
+    return await tenant_knowledge_base(db, knowledge_base_id, principal)
 
 
 async def tenant_document(

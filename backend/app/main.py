@@ -8,6 +8,7 @@ from app.services.errors import (
     PayloadTooLarge,
     ServiceError,
     UnsupportedMedia,
+    UpstreamUnavailable,
 )
 
 
@@ -24,6 +25,8 @@ async def service_error_handler(request: Request, exc: ServiceError) -> JSONResp
         status_code = 413
     elif isinstance(exc, UnsupportedMedia):
         status_code = 415
+    elif isinstance(exc, UpstreamUnavailable):
+        status_code = 503
     else:
         status_code = 400
     return JSONResponse(status_code=status_code, content={"detail": exc.message})

@@ -11,8 +11,8 @@ from sqlalchemy import func, select
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
 from app.models.index_job import IndexJob, IndexJobStatus
+from app.rag.embeddings import EMBEDDING_DIMENSIONS
 from app.services.indexer import (
-    EMBEDDING_DIMENSIONS,
     LeaseLost,
     _publish_index,
     _with_lease_heartbeat,

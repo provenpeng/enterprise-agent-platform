@@ -2,7 +2,7 @@
 
 面向企业知识检索与业务诊断的 AI Agent 平台。产品目标见 [产品规格](docs/PRODUCT_SPEC.md)。
 
-目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding 和 pgvector 存储。检索、带引用问答和业务 Agent 尚未实现。
+目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding、pgvector 存储和租户隔离的知识库检索。带引用问答和业务 Agent 尚未实现。
 
 ## 环境要求
 
@@ -11,7 +11,7 @@
 
 ## 快速开始
 
-在仓库根目录复制配置并生成本地演示用的 RSA 密钥。私钥只留在本机，API 容器只挂载公钥。只体验 API 时可以不填 `OPENAI_API_KEY`；要处理索引任务，需要填入可用的密钥：
+在仓库根目录复制配置并生成本地演示用的 RSA 密钥。私钥只留在本机，API 容器只挂载公钥。只体验非模型 API 时可以不填 `OPENAI_API_KEY`；要处理索引任务或检索，需要填入可用的密钥：
 
 ```bash
 cp .env.example .env
@@ -71,6 +71,17 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/RE
 curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
 ```
 
+worker 完成索引后检索知识库：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/search \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"退款需要谁批准？","top_k":5,"min_score":0.5}'
+```
+
+命中结果包含分数和文档、页码、章节等来源字段。接口与隔离、排序规则见 [检索设计](docs/RETRIEVAL.md)。
+
 上传支持 PDF、Markdown 和 TXT，默认上限为 10 MiB。同一知识库内上传相同内容会返回 HTTP 409。上传事务同时写入首个索引任务；worker 可离线恢复任务。原文件在本地开发时保存在 `data/uploads/`，在 Compose 中保存在共享命名卷。
 
 知识库和文档列表接口均支持 `limit`、`offset` 查询参数，默认返回 20 条，`limit` 最大为 100。数据库中的 `storage_uri` 保存相对于 `data/uploads/` 的文件 key，API 响应不公开服务器文件路径。
@@ -100,7 +111,7 @@ pip install -e '.[test]'
 pytest
 ```
 
-测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试和过期 worker 的发布保护。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
+测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试、过期 worker 的发布保护和租户隔离检索。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
 
 ## 当前数据模型
 

@@ -11,6 +11,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.chunk import Chunk
+    from app.models.index_job import IndexJob
     from app.models.knowledge_base import KnowledgeBase
 
 
@@ -58,5 +59,8 @@ class Document(Base):
 
     knowledge_base: Mapped["KnowledgeBase"] = relationship(back_populates="documents")
     chunks: Mapped[list["Chunk"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan", passive_deletes=True
+    )
+    index_jobs: Mapped[list["IndexJob"]] = relationship(
         back_populates="document", cascade="all, delete-orphan", passive_deletes=True
     )

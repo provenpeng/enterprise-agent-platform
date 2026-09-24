@@ -12,11 +12,14 @@ dependencies = [
     "asyncpg>=0.29,<1",
     "fastapi>=0.115,<1",
     "langchain-core>=1.2.31,<2",
+    "langchain-openai>=1.1,<2",
     "langchain-text-splitters>=1.1,<1.2",
+    "pgvector>=0.4,<1",
     "python-multipart>=0.0.9,<1",
     "pydantic-settings>=2.5,<3",
     "pypdf>=5,<7",
     "SQLAlchemy[asyncio]>=2.0,<3",
+    "tiktoken>=0.9,<1",
     "uvicorn[standard]>=0.30,<1",
 ]
 
@@ -26,6 +29,7 @@ test = [
     "pytest>=8,<10",
     "pytest-asyncio>=0.24,<2",
     "reportlab>=4,<5",
+    "ruff>=0.16,<1",
 ]
 
 [tool.setuptools.packages.find]
@@ -35,3 +39,6 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

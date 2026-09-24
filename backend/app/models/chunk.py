@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from app.db.base import Base
 
@@ -21,6 +22,12 @@ class Chunk(Base):
         CheckConstraint("token_count >= 0", name="ck_chunks_token_count_nonnegative"),
         CheckConstraint("page_number IS NULL OR page_number > 0", name="ck_chunks_page_number_positive"),
         Index("ix_chunks_document_version", "document_id", "index_version"),
+        Index(
+            "ix_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -34,6 +41,7 @@ class Chunk(Base):
     page_number: Mapped[int | None] = mapped_column(Integer)
     section_title: Mapped[str | None] = mapped_column(Text)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, nullable=False, default=dict)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped["Document"] = relationship(back_populates="chunks")

@@ -3,7 +3,6 @@
 import asyncio
 import hashlib
 import logging
-import math
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import Settings
 from app.models.document import DocumentStatus
 from app.rag.processing import PROCESSING_VERSION, create_document_processor
+from app.rag.embeddings import validate_embedding
 from app.services.errors import PermanentIndexError
 from app.services.index_store import (
     ClaimedJob,
@@ -26,7 +26,6 @@ from app.services.index_jobs import TOKENIZER_NAME
 
 
 logger = logging.getLogger(__name__)
-EMBEDDING_DIMENSIONS = 1536
 T = TypeVar("T")
 
 
@@ -79,10 +78,7 @@ def _validate_embeddings(vectors: list[list[float]], expected_count: int) -> Non
     if len(vectors) != expected_count:
         raise ValueError("Embedding provider returned the wrong number of vectors")
     for vector in vectors:
-        if len(vector) != EMBEDDING_DIMENSIONS or not all(
-            isinstance(value, (int, float)) and math.isfinite(value) for value in vector
-        ):
-            raise ValueError("Embedding provider returned an invalid vector")
+        validate_embedding(vector)
 
 
 async def process_one_index_job(

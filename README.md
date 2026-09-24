@@ -11,10 +11,13 @@
 
 ## 快速开始
 
-在仓库根目录复制配置。只体验 API 时可以不填 `OPENAI_API_KEY`；要处理索引任务，需要填入可用的密钥：
+在仓库根目录复制配置并生成本地演示用的 RSA 密钥。私钥只留在本机，API 容器只挂载公钥。只体验 API 时可以不填 `OPENAI_API_KEY`；要处理索引任务，需要填入可用的密钥：
 
 ```bash
 cp .env.example .env
+mkdir -p config
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out config/auth-private.pem
+openssl pkey -in config/auth-private.pem -pubout -out config/auth-public.pem
 docker compose up -d --build
 docker compose ps
 ```
@@ -35,22 +38,30 @@ curl http://127.0.0.1:8000/api/v1/health
 
 本地开发也可以只用 Compose 启动 PostgreSQL，然后在 `backend/` 建立 Python 3.12 虚拟环境、运行 `pip install -e '.[test]'`、`alembic upgrade head`，分别启动 `uvicorn app.main:app --reload` 与 `python -m app.worker`。worker 需要 `OPENAI_API_KEY`。
 
+生成一小时有效的本地演示 Token。生产环境应由身份服务签发 RS256 JWT；API 校验签发方、受众、签发时间、过期时间和主体。知识库按 JWT `sub` 隔离。此前创建的知识库在迁移后归入不可登录的 `legacy-unassigned` 主体，需要管理员在数据库中明确分配新主人。
+
+```bash
+TOKEN=$(python3 backend/scripts/dev_token.py --subject demo-user)
+```
+
 创建知识库并上传虚构的示例规则：
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"Policies","description":"Demo policies"}'
 curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/documents \
+  -H "Authorization: Bearer $TOKEN" \
   -F 'file=@./examples/refund_policy.md;type=text/markdown'
 ```
 
 上传响应中的 `id` 是文档 ID。查看处理任务和活动分片，或请求重建索引：
 
 ```bash
-curl http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
-curl http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/chunks
-curl -X POST http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/chunks
+curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
 ```
 
 上传支持 PDF、Markdown 和 TXT，默认上限为 10 MiB。同一知识库内上传相同内容会返回 HTTP 409。上传事务同时写入首个索引任务；worker 可离线恢复任务。原文件在本地开发时保存在 `data/uploads/`，在 Compose 中保存在共享命名卷。

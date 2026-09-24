@@ -15,6 +15,7 @@ from app.rag.types import ChunkCandidate, ParsedDocument
 
 
 ProcessingBackend = Literal["manual", "langchain"]
+PROCESSING_VERSION = "1"
 SourceT = TypeVar("SourceT")
 
 
@@ -43,14 +44,20 @@ def create_document_processor(
     if backend == "manual":
         text_parser = MarkdownParser() if file_type == "text/markdown" else TextParser()
         chunker = StructureAwareChunker(
-            target_tokens=target_tokens, max_tokens=max_tokens, token_counter=token_counter
+            target_tokens=target_tokens,
+            max_tokens=max_tokens,
+            token_counter=token_counter,
         )
     elif backend == "langchain":
         text_parser = (
-            LangChainMarkdownParser() if file_type == "text/markdown" else LangChainTextParser()
+            LangChainMarkdownParser()
+            if file_type == "text/markdown"
+            else LangChainTextParser()
         )
         chunker = LangChainChunker(
-            target_tokens=target_tokens, max_tokens=max_tokens, token_counter=token_counter
+            target_tokens=target_tokens,
+            max_tokens=max_tokens,
+            token_counter=token_counter,
         )
     else:
         raise ValueError(f"Unknown document processing backend: {backend}")

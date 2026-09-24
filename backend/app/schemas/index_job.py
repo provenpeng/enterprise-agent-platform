@@ -13,7 +13,13 @@ class IndexJobRead(BaseModel):
     document_id: uuid.UUID
     index_version: int
     processing_backend: str
+    processing_version: str
     embedding_model: str
+    target_tokens: int
+    max_tokens: int
+    max_chunks: int
+    embed_batch_size: int
+    tokenizer_name: str
     status: IndexJobStatus
     attempts: int
     next_attempt_at: datetime

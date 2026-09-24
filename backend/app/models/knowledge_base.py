@@ -20,10 +20,15 @@ class KnowledgeBaseStatus(str, enum.Enum):
 
 class KnowledgeBase(Base):
     __tablename__ = "knowledge_bases"
-    __table_args__ = (UniqueConstraint("name", name="uq_knowledge_bases_name"),)
+    __table_args__ = (
+        UniqueConstraint("owner_sub", "name", name="uq_knowledge_bases_owner_name"),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    owner_sub: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(String(2000))
     status: Mapped[KnowledgeBaseStatus] = mapped_column(
         Enum(KnowledgeBaseStatus, name="knowledge_base_status"),
@@ -31,11 +36,15 @@ class KnowledgeBase(Base):
         default=KnowledgeBaseStatus.ACTIVE,
         server_default=KnowledgeBaseStatus.ACTIVE.value,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     documents: Mapped[list["Document"]] = relationship(
-        back_populates="knowledge_base", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="knowledge_base",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )

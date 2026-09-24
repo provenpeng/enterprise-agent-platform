@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     answer,
     business,
+    diagnostic,
     documents,
     health,
     knowledge_bases,
@@ -18,5 +19,6 @@ api_router.include_router(knowledge_bases.router)
 api_router.include_router(retrieval.router)
 api_router.include_router(answer.router)
 api_router.include_router(business.router)
+api_router.include_router(diagnostic.router)
 api_router.include_router(documents.knowledge_base_documents_router)
 api_router.include_router(documents.documents_router)

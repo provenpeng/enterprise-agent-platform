@@ -11,6 +11,8 @@ def test_domain_tables_and_cascading_foreign_keys() -> None:
         "documents",
         "chunks",
         "document_index_jobs",
+        "demo_orders",
+        "demo_refund_attempts",
     }
     assert next(iter(Document.__table__.foreign_keys)).ondelete == "CASCADE"
     assert next(iter(Chunk.__table__.foreign_keys)).ondelete == "CASCADE"

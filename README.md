@@ -2,7 +2,7 @@
 
 面向企业知识检索与业务诊断的 AI Agent 平台。产品目标见 [产品规格](docs/PRODUCT_SPEC.md)。
 
-目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding、pgvector 存储、租户隔离检索和带来源引用的问答。业务 Agent 尚未实现。
+目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding、pgvector 存储、租户隔离检索、带来源引用的问答，以及租户隔离的模拟订单只读工具。业务 Agent 尚未实现。
 
 ## 环境要求
 
@@ -50,6 +50,15 @@ curl -X POST http://127.0.0.1:8000/api/v1/tenants \
 ```
 
 已有知识库迁移时按原 `owner_sub` 分配独立租户。`legacy-unassigned` 迁移租户不可登录；需要管理员明确将这些知识库归入真实租户。迁移与安全边界见 [租户隔离设计](docs/TENANCY.md)。
+
+载入虚构订单并通过只读接口核对数据：
+
+```bash
+docker compose run --rm migrate python scripts/seed_demo_orders.py --tenant-id "$TENANT_ID"
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/business/orders/DEMO-WINDOW
+```
+
+四个固定案例和隔离边界见 [模拟业务工具](docs/DEMO_BUSINESS.md)。
 
 创建知识库并上传虚构的示例规则：
 

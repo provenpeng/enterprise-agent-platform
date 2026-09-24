@@ -10,6 +10,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY scripts/seed_demo_orders.py ./scripts/seed_demo_orders.py
+COPY scripts/prune_agent_runs.py ./scripts/prune_agent_runs.py
 
 RUN pip install --no-cache-dir . \
     && useradd --create-home --uid 10001 appuser \

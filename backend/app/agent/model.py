@@ -1,7 +1,8 @@
 """Structured LangChain model boundary for diagnosis planning and explanation."""
 
 import json
-from typing import Protocol
+from dataclasses import dataclass
+from typing import Generic, Protocol, TypeVar
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -9,6 +10,39 @@ from pydantic import BaseModel, Field
 
 from app.schemas.business import OrderSnapshot
 from app.schemas.retrieval import SearchHit
+
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class TokenUsage:
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+@dataclass(frozen=True)
+class ModelCall(Generic[T]):
+    value: T
+    usage: TokenUsage | None
+
+
+def _model_call(result: object, expected_type: type[T]) -> ModelCall[T]:
+    if not isinstance(result, dict) or not isinstance(
+        result.get("parsed"), expected_type
+    ):
+        raise ValueError("Diagnostic model returned an invalid structured response")
+    raw = result.get("raw")
+    metadata = getattr(raw, "usage_metadata", None)
+    usage = None
+    if isinstance(metadata, dict):
+        usage = TokenUsage(
+            input_tokens=int(metadata["input_tokens"]),
+            output_tokens=int(metadata["output_tokens"]),
+            total_tokens=int(metadata["total_tokens"]),
+        )
+    return ModelCall(value=result["parsed"], usage=usage)
 
 
 class DiagnosticPlan(BaseModel):
@@ -24,11 +58,11 @@ class DiagnosticDraft(BaseModel):
 
 
 class DiagnosticModel(Protocol):
-    async def plan(self, question: str) -> DiagnosticPlan: ...
+    async def plan(self, question: str) -> ModelCall[DiagnosticPlan]: ...
 
     async def explain(
         self, question: str, order: OrderSnapshot, hits: list[SearchHit]
-    ) -> DiagnosticDraft: ...
+    ) -> ModelCall[DiagnosticDraft]: ...
 
 
 class LangChainDiagnosticModel:
@@ -42,13 +76,13 @@ class LangChainDiagnosticModel:
             max_tokens=512,
         )
         self._planner = chat.with_structured_output(
-            DiagnosticPlan, method="json_schema", strict=True
+            DiagnosticPlan, method="json_schema", strict=True, include_raw=True
         )
         self._explainer = chat.with_structured_output(
-            DiagnosticDraft, method="json_schema", strict=True
+            DiagnosticDraft, method="json_schema", strict=True, include_raw=True
         )
 
-    async def plan(self, question: str) -> DiagnosticPlan:
+    async def plan(self, question: str) -> ModelCall[DiagnosticPlan]:
         result = await self._planner.ainvoke(
             [
                 SystemMessage(
@@ -62,13 +96,11 @@ class LangChainDiagnosticModel:
                 HumanMessage(content=question),
             ]
         )
-        if not isinstance(result, DiagnosticPlan):
-            raise ValueError("Diagnostic planner returned an invalid response")
-        return result
+        return _model_call(result, DiagnosticPlan)
 
     async def explain(
         self, question: str, order: OrderSnapshot, hits: list[SearchHit]
-    ) -> DiagnosticDraft:
+    ) -> ModelCall[DiagnosticDraft]:
         evidence = [
             {"chunk_id": str(hit.chunk_id), "content": hit.content} for hit in hits
         ]
@@ -96,6 +128,4 @@ class LangChainDiagnosticModel:
                 ),
             ]
         )
-        if not isinstance(result, DiagnosticDraft):
-            raise ValueError("Diagnostic explainer returned an invalid response")
-        return result
+        return _model_call(result, DiagnosticDraft)

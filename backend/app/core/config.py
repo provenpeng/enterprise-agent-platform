@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     index_max_attempts: int = Field(default=3, gt=0)
     index_poll_interval_seconds: float = Field(default=2.0, gt=0)
     retrieval_embedding_timeout_seconds: float = Field(default=15, gt=0, le=120)
+    answer_model: str = "gpt-4o-mini"
+    answer_generation_timeout_seconds: float = Field(default=30, gt=0, le=120)
 
     @model_validator(mode="after")
     def validate_index_token_limits(self) -> "Settings":

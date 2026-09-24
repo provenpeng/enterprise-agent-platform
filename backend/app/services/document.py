@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.models.document import Document, DocumentStatus
+from app.models.index_job import IndexJob
 from app.models.knowledge_base import KnowledgeBase
 
 
@@ -135,6 +136,12 @@ async def upload_document(
         status=DocumentStatus.UPLOADED,
         active_index_version=None,
     )
+    index_job = IndexJob(
+        document_id=document_id,
+        index_version=1,
+        processing_backend=settings.document_processing_backend,
+        embedding_model=settings.embedding_model,
+    )
 
     directory_created = False
     committed = False
@@ -143,6 +150,7 @@ async def upload_document(
         directory_created = True
         await asyncio.to_thread(_save_original, upload.file, destination, checksum)
         db.add(document)
+        db.add(index_job)
         try:
             await db.commit()
         except IntegrityError as exc:

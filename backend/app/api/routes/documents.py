@@ -8,9 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.document import Document
+from app.models.chunk import Chunk
+from app.models.index_job import IndexJob
 from app.models.knowledge_base import KnowledgeBase
 from app.schemas.document import DocumentRead
+from app.schemas.chunk import ActiveChunkRead
+from app.schemas.index_job import IndexJobRead
 from app.services.document import upload_document
+from app.services.index_jobs import enqueue_reindex
 
 
 knowledge_base_documents_router = APIRouter(
@@ -59,3 +64,65 @@ async def get_document(
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@documents_router.post(
+    "/{document_id}/index-jobs",
+    response_model=IndexJobRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def reindex_document(
+    document_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> IndexJob:
+    return await enqueue_reindex(db, document_id, settings)
+
+
+@documents_router.get("/{document_id}/index-jobs", response_model=list[IndexJobRead])
+async def list_document_index_jobs(
+    document_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[IndexJob]:
+    if await db.get(Document, document_id) is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    result = await db.scalars(
+        select(IndexJob)
+        .where(IndexJob.document_id == document_id)
+        .order_by(IndexJob.index_version.desc())
+        .limit(20)
+    )
+    return list(result)
+
+
+@documents_router.get("/{document_id}/chunks", response_model=list[ActiveChunkRead])
+async def list_active_document_chunks(
+    document_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ActiveChunkRead]:
+    document = await db.get(Document, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if document.active_index_version is None:
+        return []
+    chunks = await db.scalars(
+        select(Chunk)
+        .where(
+            Chunk.document_id == document_id,
+            Chunk.index_version == document.active_index_version,
+        )
+        .order_by(Chunk.chunk_index)
+    )
+    return [
+        ActiveChunkRead(
+            id=chunk.id,
+            index_version=chunk.index_version,
+            chunk_index=chunk.chunk_index,
+            content=chunk.content,
+            token_count=chunk.token_count,
+            page_number=chunk.page_number,
+            section_title=chunk.section_title,
+            section_path=chunk.metadata_.get("section_path", []),
+        )
+        for chunk in chunks
+    ]

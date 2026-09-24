@@ -2,7 +2,7 @@
 
 面向企业知识检索与业务诊断的 AI Agent 平台。产品目标见 [产品规格](docs/PRODUCT_SPEC.md)。
 
-目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding、pgvector 存储、租户隔离检索、带来源引用的问答，以及租户隔离的模拟订单只读工具。业务 Agent 尚未实现。
+目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding、pgvector 存储、租户隔离检索、带来源引用的问答，以及基于 LangGraph 的模拟订单诊断工作流。
 
 ## 环境要求
 
@@ -102,6 +102,17 @@ curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/ask
 
 响应包含 `answer`、`grounded` 和 `citations`；证据不足时明确拒答。引用校验和能力边界见 [问答设计](docs/CITED_QA.md)。
 
+诊断虚构订单并按需引用退款规则：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/diagnose \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"DEMO-WINDOW 为什么退款失败？","order_id":"DEMO-WINDOW"}'
+```
+
+节点路由、拒答和超时边界见 [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)。
+
 上传支持 PDF、Markdown 和 TXT，默认上限为 10 MiB。同一知识库内上传相同内容会返回 HTTP 409。上传事务同时写入首个索引任务；worker 可离线恢复任务。原文件在本地开发时保存在 `data/uploads/`，在 Compose 中保存在共享命名卷。
 
 知识库和文档列表接口均支持 `limit`、`offset` 查询参数，默认返回 20 条，`limit` 最大为 100。数据库中的 `storage_uri` 保存相对于 `data/uploads/` 的文件 key，API 响应不公开服务器文件路径。
@@ -131,7 +142,7 @@ pip install -e '.[test]'
 pytest
 ```
 
-测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试、过期 worker 的发布保护、租户隔离检索和带引用问答。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
+测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试、过期 worker 的发布保护、租户隔离检索、带引用问答和诊断工作流路由。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
 
 ## 当前数据模型
 

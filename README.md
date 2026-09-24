@@ -113,6 +113,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/dia
 
 节点路由、拒答和超时边界见 [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)。
 
+诊断响应的 `run_id` 可供管理员查询完整步骤；固定数据集与真实 API 评测命令见 [运行轨迹与评测](docs/AGENT_TRACES_EVAL.md)。
+
 上传支持 PDF、Markdown 和 TXT，默认上限为 10 MiB。同一知识库内上传相同内容会返回 HTTP 409。上传事务同时写入首个索引任务；worker 可离线恢复任务。原文件在本地开发时保存在 `data/uploads/`，在 Compose 中保存在共享命名卷。
 
 知识库和文档列表接口均支持 `limit`、`offset` 查询参数，默认返回 20 条，`limit` 最大为 100。数据库中的 `storage_uri` 保存相对于 `data/uploads/` 的文件 key，API 响应不公开服务器文件路径。
@@ -142,7 +144,7 @@ pip install -e '.[test]'
 pytest
 ```
 
-测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试、过期 worker 的发布保护、租户隔离检索、带引用问答和诊断工作流路由。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
+测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试、过期 worker 的发布保护、租户隔离检索、带引用问答、诊断工作流路由、运行轨迹和固定评测评分。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
 
 ## 当前数据模型
 

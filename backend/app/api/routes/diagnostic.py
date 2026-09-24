@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.model import DiagnosticModel
 from app.agent.workflow import diagnose_order
+from app.agent.trace import RunRecorder
 from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
@@ -32,10 +33,18 @@ async def diagnose(
     model: Annotated[DiagnosticModel, Depends(get_diagnostic_model)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DiagnoseResponse:
+    recorder = RunRecorder(
+        db,
+        tenant_id=principal.tenant_id,
+        knowledge_base_id=knowledge_base_id,
+        question=payload.question,
+        model_name=settings.answer_model,
+    )
     return await diagnose_order(
         db,
         embeddings,
         model,
+        recorder,
         tenant_id=principal.tenant_id,
         knowledge_base_id=knowledge_base_id,
         question=payload.question,

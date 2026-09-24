@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.model import DiagnosticModel
+from app.agent.trace import RunRecorder
 from app.business.orders import OrderLookupTool
 from app.schemas.answer import AnswerCitation
 from app.schemas.business import OrderSnapshot
@@ -50,6 +51,7 @@ async def diagnose_order(
     db: AsyncSession,
     embeddings: Embeddings,
     model: DiagnosticModel,
+    recorder: RunRecorder,
     *,
     tenant_id: uuid.UUID,
     knowledge_base_id: uuid.UUID,
@@ -62,111 +64,137 @@ async def diagnose_order(
     """Run at most four graph nodes, with no arbitrary model-selected tool execution."""
 
     async def plan(state: DiagnosticState) -> dict:
-        try:
-            async with asyncio.timeout(planning_timeout_seconds):
-                proposal = await model.plan(state["question"])
-        except Exception as exc:
-            logger.warning("Diagnostic planning failed", exc_info=True)
-            raise UpstreamUnavailable("Diagnostic planning is unavailable") from exc
-        order_id = explicit_order_id or proposal.order_id
-        if order_id is None or not ORDER_ID_PATTERN.fullmatch(order_id):
-            return {
-                "response": DiagnoseResponse(
-                    knowledge_base_id=knowledge_base_id,
-                    status="NEEDS_ORDER_ID",
-                    answer="请提供有效的订单编号。",
-                    order=None,
-                    citations=[],
-                )
+        async with recorder.step("plan", {"question": state["question"]}) as trace:
+            try:
+                async with asyncio.timeout(planning_timeout_seconds):
+                    call = await model.plan(state["question"])
+            except Exception as exc:
+                logger.warning("Diagnostic planning failed", exc_info=True)
+                raise UpstreamUnavailable("Diagnostic planning is unavailable") from exc
+            trace.usage = call.usage
+            proposal = call.value
+            order_id = explicit_order_id or proposal.order_id
+            if order_id is None or not ORDER_ID_PATTERN.fullmatch(order_id):
+                trace.output = {"status": "NEEDS_ORDER_ID"}
+                return {
+                    "response": DiagnoseResponse(
+                        knowledge_base_id=knowledge_base_id,
+                        status="NEEDS_ORDER_ID",
+                        answer="请提供有效的订单编号。",
+                        order=None,
+                        citations=[],
+                    )
+                }
+            trace.output = {
+                "order_id": order_id,
+                "search_policy": proposal.search_policy,
             }
-        return {"order_id": order_id, "search_policy": proposal.search_policy}
+            return {"order_id": order_id, "search_policy": proposal.search_policy}
 
     async def lookup(state: DiagnosticState) -> dict:
-        try:
-            order = await OrderLookupTool(db, tenant_id).lookup(state["order_id"])
-        except SQLAlchemyError as exc:
-            logger.warning("Diagnostic order lookup failed", exc_info=True)
-            raise UpstreamUnavailable("Order lookup is unavailable") from exc
-        if order is None:
-            return {
-                "response": DiagnoseResponse(
-                    knowledge_base_id=knowledge_base_id,
-                    status="ORDER_NOT_FOUND",
-                    answer="未找到该订单。",
-                    order=None,
-                    citations=[],
-                )
-            }
-        return {"order": order}
+        async with recorder.step(
+            "lookup_order", {"order_id": state["order_id"]}
+        ) as trace:
+            try:
+                order = await OrderLookupTool(db, tenant_id).lookup(state["order_id"])
+            except SQLAlchemyError as exc:
+                logger.warning("Diagnostic order lookup failed", exc_info=True)
+                raise UpstreamUnavailable("Order lookup is unavailable") from exc
+            if order is None:
+                trace.output = {"status": "ORDER_NOT_FOUND"}
+                return {
+                    "response": DiagnoseResponse(
+                        knowledge_base_id=knowledge_base_id,
+                        status="ORDER_NOT_FOUND",
+                        answer="未找到该订单。",
+                        order=None,
+                        citations=[],
+                    )
+                }
+            trace.output = {"order": order.model_dump(mode="json")}
+            return {"order": order}
 
     async def retrieve(state: DiagnosticState) -> dict:
         order = state["order"]
         latest_reason = (
             order.refund_attempts[-1].reason_code if order.refund_attempts else None
         )
-        hits = await search_knowledge_base(
-            db,
-            embeddings,
-            tenant_id=tenant_id,
-            knowledge_base_id=knowledge_base_id,
-            query=f"{state['question']} {latest_reason or ''}".strip(),
-            top_k=5,
-            min_score=0.5,
-            timeout_seconds=embedding_timeout_seconds,
-        )
-        return {"hits": hits}
+        query = f"{state['question']} {latest_reason or ''}".strip()
+        async with recorder.step("retrieve_policy", {"query": query}) as trace:
+            hits = await search_knowledge_base(
+                db,
+                embeddings,
+                tenant_id=tenant_id,
+                knowledge_base_id=knowledge_base_id,
+                query=query,
+                top_k=5,
+                min_score=0.5,
+                timeout_seconds=embedding_timeout_seconds,
+            )
+            trace.output = {"hits": [hit.model_dump(mode="json") for hit in hits]}
+            return {"hits": hits}
 
     async def compose(state: DiagnosticState) -> dict:
         order = state["order"]
         hits = state.get("hits", [])
-        if not hits:
-            return {
-                "response": DiagnoseResponse(
+        async with recorder.step(
+            "compose", {"candidate_chunk_ids": [str(hit.chunk_id) for hit in hits]}
+        ) as trace:
+            if not hits:
+                response = DiagnoseResponse(
                     knowledge_base_id=knowledge_base_id,
                     status="BUSINESS_FACTS_ONLY",
                     answer=_business_facts(order),
                     order=order,
                     citations=[],
                 )
+            else:
+                try:
+                    async with asyncio.timeout(generation_timeout_seconds):
+                        call = await model.explain(state["question"], order, hits)
+                except Exception as exc:
+                    logger.warning("Diagnostic explanation failed", exc_info=True)
+                    raise UpstreamUnavailable(
+                        "Diagnostic explanation is unavailable"
+                    ) from exc
+                trace.usage = call.usage
+                draft = call.value
+                authorized = {str(hit.chunk_id): hit for hit in hits}
+                cited_ids = list(dict.fromkeys(draft.cited_chunk_ids))
+                if (
+                    not draft.answer.strip()
+                    or not cited_ids
+                    or any(chunk_id not in authorized for chunk_id in cited_ids)
+                ):
+                    logger.info("Diagnostic explanation lacked valid policy citations")
+                    response = DiagnoseResponse(
+                        knowledge_base_id=knowledge_base_id,
+                        status="BUSINESS_FACTS_ONLY",
+                        answer=_business_facts(order),
+                        order=order,
+                        citations=[],
+                    )
+                else:
+                    citations = [
+                        AnswerCitation(number=index, source=authorized[chunk_id])
+                        for index, chunk_id in enumerate(cited_ids, start=1)
+                    ]
+                    markers = " ".join(f"[{citation.number}]" for citation in citations)
+                    response = DiagnoseResponse(
+                        knowledge_base_id=knowledge_base_id,
+                        status="ANSWERED",
+                        answer=f"{draft.answer.strip()}\n\n来源：{markers}",
+                        order=order,
+                        citations=citations,
+                    )
+            trace.output = {
+                "status": response.status,
+                "answer": response.answer,
+                "cited_chunk_ids": [
+                    str(item.source.chunk_id) for item in response.citations
+                ],
             }
-        try:
-            async with asyncio.timeout(generation_timeout_seconds):
-                draft = await model.explain(state["question"], order, hits)
-        except Exception as exc:
-            logger.warning("Diagnostic explanation failed", exc_info=True)
-            raise UpstreamUnavailable("Diagnostic explanation is unavailable") from exc
-
-        authorized = {str(hit.chunk_id): hit for hit in hits}
-        cited_ids = list(dict.fromkeys(draft.cited_chunk_ids))
-        if (
-            not draft.answer.strip()
-            or not cited_ids
-            or any(chunk_id not in authorized for chunk_id in cited_ids)
-        ):
-            logger.info("Diagnostic explanation lacked valid policy citations")
-            return {
-                "response": DiagnoseResponse(
-                    knowledge_base_id=knowledge_base_id,
-                    status="BUSINESS_FACTS_ONLY",
-                    answer=_business_facts(order),
-                    order=order,
-                    citations=[],
-                )
-            }
-        citations = [
-            AnswerCitation(number=index, source=authorized[chunk_id])
-            for index, chunk_id in enumerate(cited_ids, start=1)
-        ]
-        markers = " ".join(f"[{citation.number}]" for citation in citations)
-        return {
-            "response": DiagnoseResponse(
-                knowledge_base_id=knowledge_base_id,
-                status="ANSWERED",
-                answer=f"{draft.answer.strip()}\n\n来源：{markers}",
-                order=order,
-                citations=citations,
-            )
-        }
+            return {"response": response}
 
     graph = StateGraph(DiagnosticState)
     graph.add_node("plan", plan)
@@ -189,7 +217,14 @@ async def diagnose_order(
     )
     graph.add_edge("retrieve_policy", "compose")
     graph.add_edge("compose", END)
-    result = await graph.compile().ainvoke(
-        {"question": question}, config={"recursion_limit": 8}
-    )
-    return result["response"]
+    await recorder.start()
+    try:
+        result = await graph.compile().ainvoke(
+            {"question": question}, config={"recursion_limit": 8}
+        )
+        response = result["response"].model_copy(update={"run_id": recorder.run_id})
+    except Exception as exc:
+        await recorder.finish(error=exc)
+        raise
+    await recorder.finish(response=response)
+    return response

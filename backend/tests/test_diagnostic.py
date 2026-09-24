@@ -5,15 +5,16 @@ import uuid
 
 import pytest
 from langchain_core.embeddings import Embeddings
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select, text
 
-from app.agent.model import DiagnosticDraft, DiagnosticPlan
+from app.agent.model import DiagnosticDraft, DiagnosticPlan, ModelCall, TokenUsage
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
 from app.business.demo_seed import seed_demo_orders
 from app.business.orders import OrderLookupTool
 from app.main import app
 from app.models.chunk import Chunk
+from app.models.agent_run import AgentRun, AgentRunStatus, AgentRunStep
 from app.models.document import Document, DocumentStatus
 from app.models.tenant import Tenant
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
@@ -44,17 +45,25 @@ class FixedDiagnosticModel:
         self.explain_calls = 0
         self.delay = 0.0
 
-    async def plan(self, question: str) -> DiagnosticPlan:
+    async def plan(self, question: str) -> ModelCall[DiagnosticPlan]:
         self.plan_calls += 1
         if self.delay:
             await asyncio.sleep(self.delay)
-        return DiagnosticPlan(order_id=self.order_id, search_policy=self.search_policy)
+        return ModelCall(
+            value=DiagnosticPlan(
+                order_id=self.order_id, search_policy=self.search_policy
+            ),
+            usage=TokenUsage(input_tokens=12, output_tokens=4, total_tokens=16),
+        )
 
-    async def explain(self, question: str, order, hits) -> DiagnosticDraft:
+    async def explain(self, question: str, order, hits) -> ModelCall[DiagnosticDraft]:
         self.explain_calls += 1
-        return DiagnosticDraft(
-            answer=f"{order.order_id} 的退款因规则期限已过而失败。",
-            cited_chunk_ids=[self.citation_override or str(hits[0].chunk_id)],
+        return ModelCall(
+            value=DiagnosticDraft(
+                answer=f"{order.order_id} 的退款因规则期限已过而失败。",
+                cited_chunk_ids=[self.citation_override or str(hits[0].chunk_id)],
+            ),
+            usage=TokenUsage(input_tokens=24, output_tokens=8, total_tokens=32),
         )
 
 
@@ -116,6 +125,42 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     assert body["answer"].endswith("来源：[1]")
     assert body["citations"][0]["source"]["chunk_id"] == str(chunk_id)
     assert (model.plan_calls, model.explain_calls, embeddings.calls) == (1, 1, 1)
+    assert body["run_id"]
+    admin_run = await client.get(f"/api/v1/agent-runs/{body['run_id']}")
+    assert admin_run.status_code == 200
+    trace = admin_run.json()
+    assert trace["status"] == "SUCCEEDED"
+    assert trace["outcome"] == "ANSWERED"
+    assert trace["model_name"] == "gpt-4o-mini"
+    assert (trace["input_tokens"], trace["output_tokens"], trace["total_tokens"]) == (
+        36,
+        12,
+        48,
+    )
+    assert [step["name"] for step in trace["steps"]] == [
+        "plan",
+        "lookup_order",
+        "retrieve_policy",
+        "compose",
+    ]
+    assert trace["steps"][1]["output_data"]["order"]["order_id"] == "DEMO-WINDOW"
+    assert trace["steps"][2]["output_data"]["hits"][0]["chunk_id"] == str(chunk_id)
+    assert trace["steps"][3]["total_tokens"] == 32
+    assert (
+        await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=viewer)
+    ).status_code == 403
+    assert len((await client.get("/api/v1/agent-runs?limit=1")).json()) == 1
+    other_tenant = uuid.uuid4()
+    async with sessions() as db:
+        db.add(Tenant(id=other_tenant, name="Audit outsider"))
+        await db.commit()
+    outsider = {
+        "Authorization": f"Bearer {make_token('outsider', tenant_id=str(other_tenant))}"
+    }
+    assert (
+        await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=outsider)
+    ).status_code == 404
+    assert (await client.get("/api/v1/agent-runs", headers=outsider)).json() == []
 
     model.order_id = "DEMO-SUCCESS"
     explicit = await client.post(
@@ -195,6 +240,7 @@ async def test_diagnostic_rejects_cross_tenant_kb_before_model_calls(api_client)
         await client.post(path, json={"question": "DEMO-WINDOW?"}, headers=outsider)
     ).status_code == 404
     assert model.plan_calls == embeddings.calls == 0
+    assert (await client.get("/api/v1/agent-runs")).json() == []
 
     model.delay = 0.05
     settings.diagnostic_planning_timeout_seconds = 0.001
@@ -215,7 +261,7 @@ async def test_diagnostic_masks_business_tool_failure(api_client, monkeypatch):
     app.dependency_overrides[get_query_embeddings] = lambda: embeddings
 
     async def fail_lookup(self, order_id):
-        raise SQLAlchemyError("internal connection detail")
+        await self._db.execute(text("SELECT missing_column FROM demo_orders LIMIT 1"))
 
     monkeypatch.setattr(OrderLookupTool, "lookup", fail_lookup)
     response = await client.post(
@@ -225,3 +271,13 @@ async def test_diagnostic_masks_business_tool_failure(api_client, monkeypatch):
     assert response.status_code == 503
     assert response.json() == {"detail": "Order lookup is unavailable"}
     assert embeddings.calls == model.explain_calls == 0
+    async with sessions() as db:
+        run = await db.scalar(select(AgentRun))
+        steps = list(
+            await db.scalars(select(AgentRunStep).order_by(AgentRunStep.sequence))
+        )
+        assert run is not None and run.status == AgentRunStatus.FAILED
+        assert run.error_code == "UpstreamUnavailable"
+        assert [step.name for step in steps] == ["plan", "lookup_order"]
+        assert steps[-1].error_code == "UpstreamUnavailable"
+        assert "missing_column" not in str(steps[-1].output_data)

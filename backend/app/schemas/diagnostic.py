@@ -25,6 +25,7 @@ class DiagnoseRequest(BaseModel):
 
 
 class DiagnoseResponse(BaseModel):
+    run_id: uuid.UUID | None = None
     knowledge_base_id: uuid.UUID
     status: Literal[
         "ANSWERED", "BUSINESS_FACTS_ONLY", "NEEDS_ORDER_ID", "ORDER_NOT_FOUND"

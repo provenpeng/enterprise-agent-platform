@@ -38,11 +38,18 @@ curl http://127.0.0.1:8000/api/v1/health
 
 本地开发也可以只用 Compose 启动 PostgreSQL，然后在 `backend/` 建立 Python 3.12 虚拟环境、运行 `pip install -e '.[test]'`、`alembic upgrade head`，分别启动 `uvicorn app.main:app --reload` 与 `python -m app.worker`。worker 需要 `OPENAI_API_KEY`。
 
-生成一小时有效的本地演示 Token。生产环境应由身份服务签发 RS256 JWT；API 校验签发方、受众、签发时间、过期时间和主体。知识库按 JWT `sub` 隔离。此前创建的知识库在迁移后归入不可登录的 `legacy-unassigned` 主体，需要管理员在数据库中明确分配新主人。
+生成一小时有效的本地演示 Token。生产环境由身份服务签发 RS256 JWT，包含 `sub`、`tenant_id` 和 `role`。API 按租户隔离数据；`admin` 可维护租户、知识库和文档，`viewer` 可读取。同租户成员共享知识库。租户 ID 只能来自签名的 Token，不能由请求正文指定。
 
 ```bash
-TOKEN=$(python3 backend/scripts/dev_token.py --subject demo-user)
+TENANT_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
+TOKEN=$(python3 backend/scripts/dev_token.py --subject demo-user --tenant-id "$TENANT_ID" --role admin)
+curl -X POST http://127.0.0.1:8000/api/v1/tenants \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Demo tenant"}'
 ```
+
+已有知识库迁移时按原 `owner_sub` 分配独立租户。`legacy-unassigned` 迁移租户不可登录；需要管理员明确将这些知识库归入真实租户。迁移与安全边界见 [租户隔离设计](docs/TENANCY.md)。
 
 创建知识库并上传虚构的示例规则：
 
@@ -97,7 +104,7 @@ pytest
 
 ## 当前数据模型
 
-`KnowledgeBase` 包含多个 `Document`；每个 `Document` 包含索引任务和按 `index_version` 区分的 `Chunk`。`Chunk.embedding` 为 1536 维向量，使用 HNSW 余弦索引。删除知识库或文档时，数据库外键级联删除下级记录。
+`Tenant` 包含多个 `KnowledgeBase`，每个知识库包含多个 `Document`；每个文档包含索引任务和按 `index_version` 区分的 `Chunk`。`Chunk.embedding` 为 1536 维向量，使用 HNSW 余弦索引。删除知识库或文档时，数据库外键级联删除下级记录。
 
 `Document.status` 表示最近一次处理尝试的状态。重建失败时，`status` 可以是 `FAILED`，而 `active_index_version` 仍指向可用的旧版本。新版本的分片、向量和活动版本指针在同一事务内发布。
 

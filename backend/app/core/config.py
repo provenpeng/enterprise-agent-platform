@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     retrieval_embedding_timeout_seconds: float = Field(default=15, gt=0, le=120)
     answer_model: str = "gpt-4o-mini"
     answer_generation_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    diagnostic_planning_timeout_seconds: float = Field(default=10, gt=0, le=60)
 
     @model_validator(mode="after")
     def validate_index_token_limits(self) -> "Settings":

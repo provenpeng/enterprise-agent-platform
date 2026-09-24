@@ -9,6 +9,7 @@ from langchain_openai import OpenAIEmbeddings
 from app.core.config import get_settings
 from app.db.session import SessionLocal, engine
 from app.services.indexer import EMBEDDING_DIMENSIONS, process_one_index_job
+from app.services.index_jobs import TOKENIZER_NAME
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,10 @@ async def run_worker() -> None:
         model=settings.embedding_model,
         dimensions=EMBEDDING_DIMENSIONS,
         api_key=settings.openai_api_key,
+        request_timeout=settings.index_embedding_timeout_seconds,
+        max_retries=0,
     )
-    encoding = tiktoken.get_encoding("cl100k_base")
+    encoding = tiktoken.get_encoding(TOKENIZER_NAME)
 
     def token_counter(value: str) -> int:
         return len(encoding.encode(value))

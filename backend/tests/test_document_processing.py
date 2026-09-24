@@ -2,7 +2,6 @@ import pytest
 
 from app.core.config import Settings
 from app.rag.processing import create_document_processor
-from app.services.document_processing import document_processor_from_settings
 
 
 MARKDOWN = (
@@ -41,8 +40,13 @@ def test_backends_share_chunk_contract_and_preserve_source(
     assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
     assert set(chunk.section_path for chunk in chunks) == set(expected_sections)
     assert all(0 < chunk.token_count <= 12 for chunk in chunks)
-    assert all(chunk.block_start is not None and chunk.block_end is not None for chunk in chunks)
-    assert all(chunk.block_start <= chunk.block_end < len(parsed.blocks) for chunk in chunks)
+    assert all(
+        chunk.block_start is not None and chunk.block_end is not None
+        for chunk in chunks
+    )
+    assert all(
+        chunk.block_start <= chunk.block_end < len(parsed.blocks) for chunk in chunks
+    )
     assert all(chunk.content.strip() for chunk in chunks)
 
 
@@ -52,16 +56,20 @@ def test_settings_select_backend_without_changing_caller(backend: str) -> None:
         database_url="postgresql+asyncpg://example:example@localhost/example",
         document_processing_backend=backend,
     )
-    processor = document_processor_from_settings(
-        settings,
+    processor = create_document_processor(
+        backend=settings.document_processing_backend,
         file_type="text/markdown",
         target_tokens=20,
         max_tokens=30,
         token_counter=len,
     )
 
-    assert processor.process("# Rules\n\nRefunds require approval.")[0].section_path == ("Rules",)
-    assert ("langchain" in type(processor.parser).__module__) is (backend == "langchain")
+    assert processor.process("# Rules\n\nRefunds require approval.")[
+        0
+    ].section_path == ("Rules",)
+    assert ("langchain" in type(processor.parser).__module__) is (
+        backend == "langchain"
+    )
 
 
 @pytest.mark.parametrize("backend", ["manual", "langchain"])
@@ -97,7 +105,9 @@ def test_langchain_parser_keeps_fenced_heading_in_parent_section() -> None:
         token_counter=len,
     )
 
-    chunks = processor.process("# Rules\n\n```python\n# code comment\n```\n\nApply the rule.")
+    chunks = processor.process(
+        "# Rules\n\n```python\n# code comment\n```\n\nApply the rule."
+    )
 
     assert chunks
     assert all(chunk.section_path == ("Rules",) for chunk in chunks)

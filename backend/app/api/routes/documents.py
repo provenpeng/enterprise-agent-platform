@@ -1,16 +1,16 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import Principal, get_principal, owned_document, owned_knowledge_base
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.document import Document
 from app.models.chunk import Chunk
 from app.models.index_job import IndexJob
-from app.models.knowledge_base import KnowledgeBase
 from app.schemas.document import DocumentRead
 from app.schemas.chunk import ActiveChunkRead
 from app.schemas.index_job import IndexJobRead
@@ -32,7 +32,9 @@ async def upload_knowledge_base_document(
     file: Annotated[UploadFile, File(...)],
     db: Annotated[AsyncSession, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(get_principal)],
 ) -> Document:
+    await owned_knowledge_base(db, knowledge_base_id, principal)
     return await upload_document(db, knowledge_base_id, file, settings)
 
 
@@ -40,11 +42,11 @@ async def upload_knowledge_base_document(
 async def list_knowledge_base_documents(
     knowledge_base_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[Document]:
-    if await db.get(KnowledgeBase, knowledge_base_id) is None:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    await owned_knowledge_base(db, knowledge_base_id, principal)
     result = await db.scalars(
         select(Document)
         .where(Document.knowledge_base_id == knowledge_base_id)
@@ -59,11 +61,9 @@ async def list_knowledge_base_documents(
 async def get_document(
     document_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
 ) -> Document:
-    document = await db.get(Document, document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
+    return await owned_document(db, document_id, principal)
 
 
 @documents_router.post(
@@ -75,7 +75,9 @@ async def reindex_document(
     document_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(get_principal)],
 ) -> IndexJob:
+    await owned_document(db, document_id, principal)
     return await enqueue_reindex(db, document_id, settings)
 
 
@@ -83,9 +85,9 @@ async def reindex_document(
 async def list_document_index_jobs(
     document_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
 ) -> list[IndexJob]:
-    if await db.get(Document, document_id) is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    await owned_document(db, document_id, principal)
     result = await db.scalars(
         select(IndexJob)
         .where(IndexJob.document_id == document_id)
@@ -99,12 +101,11 @@ async def list_document_index_jobs(
 async def list_active_document_chunks(
     document_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ActiveChunkRead]:
-    document = await db.get(Document, document_id)
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = await owned_document(db, document_id, principal)
     if document.active_index_version is None:
         return []
     chunks = await db.scalars(

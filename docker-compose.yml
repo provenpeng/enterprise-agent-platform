@@ -32,10 +32,17 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       DOCUMENT_PROCESSING_BACKEND: ${DOCUMENT_PROCESSING_BACKEND:-manual}
       MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-10485760}
+      AUTH_ISSUER: ${AUTH_ISSUER:-enterprise-agent-platform}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-enterprise-agent-api}
+      INDEX_TARGET_TOKENS: ${INDEX_TARGET_TOKENS:-400}
+      INDEX_MAX_TOKENS: ${INDEX_MAX_TOKENS:-600}
+      INDEX_MAX_CHUNKS: ${INDEX_MAX_CHUNKS:-1000}
+      INDEX_EMBED_BATCH_SIZE: ${INDEX_EMBED_BATCH_SIZE:-32}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - uploads:/app/data/uploads
+      - ./config/auth-public.pem:/app/config/auth-public.pem:ro
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -54,6 +61,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       DOCUMENT_PROCESSING_BACKEND: ${DOCUMENT_PROCESSING_BACKEND:-manual}
+      INDEX_EMBEDDING_TIMEOUT_SECONDS: ${INDEX_EMBEDDING_TIMEOUT_SECONDS:-60}
+      INDEX_LEASE_SECONDS: ${INDEX_LEASE_SECONDS:-900}
     volumes:
       - uploads:/app/data/uploads
     depends_on:

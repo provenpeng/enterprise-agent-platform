@@ -1,10 +1,13 @@
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 from app.rag.types import ChunkCandidate, ParsedDocument
 
 
-class DocumentParser(Protocol):
-    def parse(self, text: str) -> ParsedDocument: ...
+SourceT = TypeVar("SourceT", contravariant=True)
+
+
+class DocumentParser(Protocol[SourceT]):
+    def parse(self, source: SourceT) -> ParsedDocument: ...
 
 
 class DocumentChunker(Protocol):

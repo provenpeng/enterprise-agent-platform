@@ -86,7 +86,13 @@ class StructureAwareChunker:
         chunks: list[ChunkCandidate] = []
         pending: list[ParsedBlock] = []
 
-        def emit(content: str, section_path: tuple[str, ...], start: int, end: int) -> None:
+        def emit(
+            content: str,
+            section_path: tuple[str, ...],
+            start: int,
+            end: int,
+            page_number: int | None,
+        ) -> None:
             chunks.append(
                 ChunkCandidate(
                     content=content,
@@ -95,6 +101,7 @@ class StructureAwareChunker:
                     token_count=self._count(content),
                     block_start=start,
                     block_end=end,
+                    page_number=page_number,
                 )
             )
 
@@ -105,6 +112,7 @@ class StructureAwareChunker:
                     pending[0].section_path,
                     pending[0].order,
                     pending[-1].order,
+                    pending[0].page_number,
                 )
                 pending.clear()
 
@@ -115,12 +123,15 @@ class StructureAwareChunker:
             if block.block_type != "paragraph" or not block.text.strip():
                 continue
 
-            if pending and pending[0].section_path != block.section_path:
+            if pending and (
+                pending[0].section_path != block.section_path
+                or pending[0].page_number != block.page_number
+            ):
                 flush()
             if self._count(block.text) > self.max_tokens:
                 flush()
                 for part in self._split_paragraph(block.text):
-                    emit(part, block.section_path, block.order, block.order)
+                    emit(part, block.section_path, block.order, block.order, block.page_number)
                 continue
 
             if pending and not self._append_fits(

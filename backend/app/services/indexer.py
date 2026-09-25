@@ -84,11 +84,12 @@ def _validate_embeddings(vectors: list[list[float]], expected_count: int) -> Non
 def _check_job_compatibility(claim: ClaimedJob, settings: Settings) -> None:
     if (
         claim.embedding_model != settings.embedding_model
+        or claim.embedding_space_id != settings.embedding_space_id
         or claim.tokenizer_name != TOKENIZER_NAME
         or claim.processing_version != PROCESSING_VERSION
     ):
         raise PermanentIndexError(
-            "Index job model, tokenizer, or processor version is unsupported"
+            "Index job embedding space, tokenizer, or processor version is unsupported"
         )
 
 

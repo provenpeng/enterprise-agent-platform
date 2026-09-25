@@ -40,7 +40,7 @@ class DiagnosticState(TypedDict, total=False):
 class DiagnosticOptions:
     tenant_id: uuid.UUID
     knowledge_base_id: uuid.UUID
-    embedding_model: str
+    embedding_space_id: str
     explicit_order_id: str | None
     planning_timeout_seconds: float
     embedding_timeout_seconds: float
@@ -162,7 +162,7 @@ class DiagnosticWorkflow:
                 self._embeddings,
                 tenant_id=self._options.tenant_id,
                 knowledge_base_id=self._options.knowledge_base_id,
-                embedding_model=self._options.embedding_model,
+                embedding_space_id=self._options.embedding_space_id,
                 query=query,
                 top_k=5,
                 min_score=0.5,

@@ -63,6 +63,8 @@ class IndexJob(Base):
     processing_backend: Mapped[str] = mapped_column(String(20), nullable=False)
     processing_version: Mapped[str] = mapped_column(String(20), nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
+    # NULL identifies jobs created before vector-space identity was recorded.
+    embedding_space_id: Mapped[str | None] = mapped_column(String(64))
     target_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     max_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     max_chunks: Mapped[int] = mapped_column(Integer, nullable=False)

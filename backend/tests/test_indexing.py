@@ -8,10 +8,13 @@ from langchain_core.embeddings import Embeddings
 from reportlab.pdfgen import canvas
 from sqlalchemy import func, select
 
+from app.api.embedding_provider import get_query_embeddings
+from app.main import app
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
 from app.models.index_job import IndexJob, IndexJobStatus
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
+from app.services.embedding_reindex import find_embedding_reindex_candidates
 from app.services.indexer import (
     LeaseLost,
     _publish_index,
@@ -77,6 +80,7 @@ async def test_upload_enqueues_and_worker_publishes_active_index(api_client) -> 
     assert [(job["index_version"], job["status"]) for job in job_response.json()] == [
         (1, "PENDING")
     ]
+    assert job_response.json()[0]["embedding_space_id"] == settings.embedding_space_id
     assert (await client.get(f"/api/v1/documents/{document_id}/chunks")).json() == []
 
     assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
@@ -98,6 +102,156 @@ async def test_upload_enqueues_and_worker_publishes_active_index(api_client) -> 
         )
         assert chunk is not None
         assert len(chunk.embedding) == EMBEDDING_DIMENSIONS
+        assert chunk.metadata_["embedding_space_id"] == settings.embedding_space_id
+
+
+@pytest.mark.asyncio
+async def test_same_model_name_at_new_provider_requires_reindex(api_client) -> None:
+    client, _, sessions, settings = api_client
+    document_id = await upload_text(client)
+    old_space = settings.embedding_space_id
+    old_model = settings.embedding_model
+    assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    knowledge_base_id = (await client.get(f"/api/v1/documents/{document_id}")).json()[
+        "knowledge_base_id"
+    ]
+    search_path = f"/api/v1/knowledge-bases/{knowledge_base_id}/search"
+    app.dependency_overrides[get_query_embeddings] = lambda: FakeEmbeddings()
+    assert (await client.post(search_path, json={"query": "refund"})).json()["hits"]
+
+    settings.embedding_api_base_url = "https://different-provider.example/v1"
+    assert settings.embedding_model == old_model
+    assert settings.embedding_space_id != old_space
+    hidden = await client.post(search_path, json={"query": "refund"})
+    assert hidden.status_code == 200 and hidden.json()["hits"] == []
+    assert (await client.get(f"/api/v1/documents/{document_id}")).json()[
+        "active_index_version"
+    ] == 1
+
+    async with sessions() as db:
+        candidates = await find_embedding_reindex_candidates(
+            db,
+            tenant_id=uuid.uuid5(
+                uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+            ),
+            embedding_space_id=settings.embedding_space_id,
+        )
+        assert [str(candidate.document_id) for candidate in candidates] == [document_id]
+        assert candidates[0].recorded_space_id == old_space
+
+    queued = await client.post(f"/api/v1/documents/{document_id}/index-jobs")
+    assert queued.status_code == 201
+    assert queued.json()["embedding_space_id"] == settings.embedding_space_id
+    assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    restored = await client.post(search_path, json={"query": "refund"})
+    assert restored.status_code == 200 and restored.json()["hits"]
+    assert restored.json()["hits"][0]["index_version"] == 2
+    async with sessions() as db:
+        chunks = (
+            await db.scalars(
+                select(Chunk)
+                .where(Chunk.document_id == uuid.UUID(document_id))
+                .order_by(Chunk.index_version)
+            )
+        ).all()
+        assert [chunk.index_version for chunk in chunks] == [1, 2]
+        assert [chunk.metadata_["embedding_space_id"] for chunk in chunks] == [
+            old_space,
+            settings.embedding_space_id,
+        ]
+        assert (
+            await find_embedding_reindex_candidates(
+                db,
+                tenant_id=uuid.uuid5(
+                    uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+                ),
+                embedding_space_id=settings.embedding_space_id,
+            )
+        ) == []
+
+
+@pytest.mark.asyncio
+async def test_legacy_published_index_is_discovered_for_rebuild(api_client) -> None:
+    client, _, sessions, settings = api_client
+    document_id = await upload_text(client)
+    await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    async with sessions() as db:
+        job = await db.scalar(
+            select(IndexJob).where(IndexJob.document_id == uuid.UUID(document_id))
+        )
+        chunk = await db.scalar(
+            select(Chunk).where(Chunk.document_id == uuid.UUID(document_id))
+        )
+        assert job is not None and chunk is not None
+        job.embedding_space_id = None
+        chunk.metadata_ = {"embedding_model": settings.embedding_model}
+        await db.commit()
+
+    app.dependency_overrides[get_query_embeddings] = lambda: FakeEmbeddings()
+    knowledge_base_id = (await client.get(f"/api/v1/documents/{document_id}")).json()[
+        "knowledge_base_id"
+    ]
+    search = await client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/search",
+        json={"query": "refund"},
+    )
+    assert search.status_code == 200 and search.json()["hits"] == []
+    async with sessions() as db:
+        candidates = await find_embedding_reindex_candidates(
+            db,
+            tenant_id=uuid.uuid5(
+                uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+            ),
+            embedding_space_id=settings.embedding_space_id,
+        )
+        assert [str(candidate.document_id) for candidate in candidates] == [document_id]
+        assert candidates[0].recorded_space_id is None
+        assert (
+            await find_embedding_reindex_candidates(
+                db,
+                tenant_id=uuid.uuid4(),
+                embedding_space_id=settings.embedding_space_id,
+            )
+        ) == []
+
+        job = await db.scalar(
+            select(IndexJob).where(IndexJob.document_id == uuid.UUID(document_id))
+        )
+        assert job is not None
+        job.embedding_space_id = settings.embedding_space_id
+        await db.commit()
+        assert (
+            len(
+                await find_embedding_reindex_candidates(
+                    db,
+                    tenant_id=uuid.uuid5(
+                        uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+                    ),
+                    embedding_space_id=settings.embedding_space_id,
+                )
+            )
+            == 1
+        )
+
+
+@pytest.mark.asyncio
+async def test_worker_rejects_job_from_previous_embedding_space(api_client) -> None:
+    client, _, sessions, settings = api_client
+    document_id = await upload_text(client)
+    old_space = settings.embedding_space_id
+    settings.embedding_revision = "changed-weights"
+    assert settings.embedding_space_id != old_space
+
+    assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    jobs = (await client.get(f"/api/v1/documents/{document_id}/index-jobs")).json()
+    assert jobs[0]["status"] == "FAILED"
+    assert jobs[0]["embedding_space_id"] == old_space
+    assert (await client.get(f"/api/v1/documents/{document_id}")).json()[
+        "active_index_version"
+    ] is None
+    assert (await client.post(f"/api/v1/documents/{document_id}/index-jobs")).json()[
+        "embedding_space_id"
+    ] == settings.embedding_space_id
 
 
 @pytest.mark.asyncio

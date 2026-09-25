@@ -67,7 +67,9 @@ class FixedDiagnosticModel:
         )
 
 
-async def create_context(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
+async def create_context(
+    client, sessions, space_id: str
+) -> tuple[uuid.UUID, uuid.UUID]:
     response = await client.post(
         "/api/v1/knowledge-bases", json={"name": "Diagnostics"}
     )
@@ -96,6 +98,7 @@ async def create_context(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
             metadata_={
                 "section_path": ["退款规则"],
                 "embedding_model": "text-embedding-3-small",
+                "embedding_space_id": space_id,
             },
             embedding=[1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1),
         )
@@ -106,8 +109,10 @@ async def create_context(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
 
 @pytest.mark.asyncio
 async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_client):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, chunk_id = await create_context(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_context(
+        client, sessions, settings.embedding_space_id
+    )
     model, embeddings = (
         FixedDiagnosticModel("DEMO-WINDOW", search_policy=True),
         FixedEmbeddings(),
@@ -184,8 +189,10 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
 
 @pytest.mark.asyncio
 async def test_diagnostic_short_circuits_missing_order_and_status_only(api_client):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, _ = await create_context(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _ = await create_context(
+        client, sessions, settings.embedding_space_id
+    )
     model, embeddings = (
         FixedDiagnosticModel(None, search_policy=False),
         FixedEmbeddings(),
@@ -226,7 +233,9 @@ async def test_diagnostic_short_circuits_missing_order_and_status_only(api_clien
 @pytest.mark.asyncio
 async def test_diagnostic_rejects_cross_tenant_kb_before_model_calls(api_client):
     client, _, sessions, settings = api_client
-    knowledge_base_id, _ = await create_context(client, sessions)
+    knowledge_base_id, _ = await create_context(
+        client, sessions, settings.embedding_space_id
+    )
     model, embeddings = (
         FixedDiagnosticModel("DEMO-WINDOW", search_policy=True),
         FixedEmbeddings(),
@@ -256,8 +265,10 @@ async def test_diagnostic_rejects_cross_tenant_kb_before_model_calls(api_client)
 
 @pytest.mark.asyncio
 async def test_diagnostic_masks_business_tool_failure(api_client, monkeypatch):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, _ = await create_context(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _ = await create_context(
+        client, sessions, settings.embedding_space_id
+    )
     model, embeddings = (
         FixedDiagnosticModel("DEMO-WINDOW", search_policy=True),
         FixedEmbeddings(),

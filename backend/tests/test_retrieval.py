@@ -39,7 +39,7 @@ class QueryEmbeddings(Embeddings):
         return self.result
 
 
-async def create_corpus(client, sessions):
+async def create_corpus(client, sessions, space_id: str):
     response = await client.post("/api/v1/knowledge-bases", json={"name": "Searchable"})
     assert response.status_code == 201
     knowledge_base_id = uuid.UUID(response.json()["id"])
@@ -74,6 +74,7 @@ async def create_corpus(client, sessions):
                 metadata_={
                     "section_path": ["Policies", "Refunds"],
                     "embedding_model": "text-embedding-3-small",
+                    "embedding_space_id": space_id,
                 },
                 embedding=vector(1),
             ),
@@ -83,7 +84,10 @@ async def create_corpus(client, sessions):
                 chunk_index=0,
                 content="Approval timing",
                 token_count=2,
-                metadata_={"embedding_model": "text-embedding-3-small"},
+                metadata_={
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_space_id": space_id,
+                },
                 embedding=vector(0.8, 0.6),
             ),
             Chunk(
@@ -92,7 +96,10 @@ async def create_corpus(client, sessions):
                 chunk_index=0,
                 content="Superseded answer",
                 token_count=2,
-                metadata_={"embedding_model": "text-embedding-3-small"},
+                metadata_={
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_space_id": space_id,
+                },
                 embedding=vector(1),
             ),
             Chunk(
@@ -101,16 +108,31 @@ async def create_corpus(client, sessions):
                 chunk_index=0,
                 content="Unpublished answer",
                 token_count=2,
-                metadata_={"embedding_model": "text-embedding-3-small"},
+                metadata_={
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_space_id": space_id,
+                },
                 embedding=vector(1),
             ),
             Chunk(
                 document_id=documents[0].id,
                 index_version=2,
                 chunk_index=1,
-                content="Same dimension, different embedding space",
+                content="Same model name, different embedding space",
                 token_count=6,
-                metadata_={"embedding_model": "other-model"},
+                metadata_={
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_space_id": "different-space",
+                },
+                embedding=vector(1),
+            ),
+            Chunk(
+                document_id=documents[0].id,
+                index_version=2,
+                chunk_index=2,
+                content="Legacy vector without a verified space",
+                token_count=7,
+                metadata_={"embedding_model": "text-embedding-3-small"},
                 embedding=vector(1),
             ),
         ]
@@ -121,8 +143,10 @@ async def create_corpus(client, sessions):
 
 @pytest.mark.asyncio
 async def test_search_orders_authorized_active_chunks_and_returns_sources(api_client):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, documents, chunks = await create_corpus(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, documents, chunks = await create_corpus(
+        client, sessions, settings.embedding_space_id
+    )
     embeddings = QueryEmbeddings()
     app.dependency_overrides[get_query_embeddings] = lambda: embeddings
     path = f"/api/v1/knowledge-bases/{knowledge_base_id}/search"
@@ -152,8 +176,10 @@ async def test_search_orders_authorized_active_chunks_and_returns_sources(api_cl
 
 @pytest.mark.asyncio
 async def test_search_checks_tenant_before_embedding_and_allows_viewer(api_client):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, _, _ = await create_corpus(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _, _ = await create_corpus(
+        client, sessions, settings.embedding_space_id
+    )
     embeddings = QueryEmbeddings()
     app.dependency_overrides[get_query_embeddings] = lambda: embeddings
     path = f"/api/v1/knowledge-bases/{knowledge_base_id}/search"
@@ -185,7 +211,9 @@ async def test_search_checks_tenant_before_embedding_and_allows_viewer(api_clien
 @pytest.mark.asyncio
 async def test_search_rejects_provider_failures_and_invalid_requests(api_client):
     client, _, sessions, settings = api_client
-    knowledge_base_id, _, _ = await create_corpus(client, sessions)
+    knowledge_base_id, _, _ = await create_corpus(
+        client, sessions, settings.embedding_space_id
+    )
     path = f"/api/v1/knowledge-bases/{knowledge_base_id}/search"
     app.dependency_overrides[get_query_embeddings] = lambda: QueryEmbeddings()
     for payload in (
@@ -207,8 +235,10 @@ async def test_search_rejects_provider_failures_and_invalid_requests(api_client)
 
 @pytest.mark.asyncio
 async def test_search_releases_authorization_connection_before_embedding(api_client):
-    client, engine, sessions, _ = api_client
-    knowledge_base_id, _, _ = await create_corpus(client, sessions)
+    client, engine, sessions, settings = api_client
+    knowledge_base_id, _, _ = await create_corpus(
+        client, sessions, settings.embedding_space_id
+    )
 
     class PoolCheckingEmbeddings(QueryEmbeddings):
         async def aembed_query(self, text: str) -> list[float]:

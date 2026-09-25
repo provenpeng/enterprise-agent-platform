@@ -74,6 +74,7 @@ async def api_client(
     test_engine = create_async_engine(test_database_url)
     session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
     settings = Settings(
+        _env_file=None,
         database_url=test_database_url.render_as_string(hide_password=False),
         upload_dir=tmp_path / "uploads",
         auth_public_key_path=tmp_path / "auth-public.pem",

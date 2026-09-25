@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -17,7 +17,15 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     document_processing_backend: Literal["manual", "langchain"] = "manual"
     openai_api_key: SecretStr | None = None
-    embedding_model: Literal["text-embedding-3-small"] = "text-embedding-3-small"
+    embedding_api_key: SecretStr | None = None
+    embedding_api_base_url: AnyHttpUrl | None = None
+    embedding_native_dimensions: int = Field(default=1536, ge=1, le=1536)
+    chat_api_key: SecretStr | None = None
+    chat_api_base_url: AnyHttpUrl | None = None
+    chat_disable_thinking: bool = False
+    embedding_model: str = Field(
+        default="text-embedding-3-small", min_length=1, max_length=100
+    )
     index_target_tokens: int = Field(default=400, gt=0, le=8192)
     index_max_tokens: int = Field(default=600, gt=0, le=8192)
     index_max_chunks: int = Field(default=1000, gt=0)
@@ -30,6 +38,23 @@ class Settings(BaseSettings):
     answer_model: str = "gpt-4o-mini"
     answer_generation_timeout_seconds: float = Field(default=30, gt=0, le=120)
     diagnostic_planning_timeout_seconds: float = Field(default=10, gt=0, le=60)
+
+    @property
+    def effective_chat_api_key(self) -> SecretStr | None:
+        if self.chat_api_key and self.chat_api_key.get_secret_value():
+            return self.chat_api_key
+        return self.openai_api_key
+
+    @property
+    def effective_embedding_api_key(self) -> SecretStr | None:
+        if self.embedding_api_key and self.embedding_api_key.get_secret_value():
+            return self.embedding_api_key
+        return self.openai_api_key
+
+    @field_validator("chat_api_base_url", "embedding_api_base_url", mode="before")
+    @classmethod
+    def empty_chat_base_url_is_unset(cls, value: str | None) -> str | None:
+        return value or None
 
     @model_validator(mode="after")
     def validate_index_token_limits(self) -> "Settings":

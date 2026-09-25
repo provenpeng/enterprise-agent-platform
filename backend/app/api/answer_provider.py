@@ -13,10 +13,18 @@ from app.rag.answer_generator import AnswerGenerator, LangChainAnswerGenerator
 
 @lru_cache(maxsize=2)
 def _cached_generator(
-    model: str, api_key: str, timeout_seconds: float
+    model: str,
+    api_key: str,
+    timeout_seconds: float,
+    base_url: str | None,
+    disable_thinking: bool,
 ) -> AnswerGenerator:
     return LangChainAnswerGenerator(
-        model=model, api_key=api_key, timeout_seconds=timeout_seconds
+        model=model,
+        api_key=api_key,
+        timeout_seconds=timeout_seconds,
+        base_url=base_url,
+        disable_thinking=disable_thinking,
     )
 
 
@@ -24,9 +32,14 @@ def get_answer_generator(
     _knowledge_base: Annotated[KnowledgeBase, Depends(authorized_knowledge_base)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AnswerGenerator:
-    key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else ""
+    secret = settings.effective_chat_api_key
+    key = secret.get_secret_value() if secret else ""
     if not key:
         raise HTTPException(status_code=503, detail="Answer model is not configured")
     return _cached_generator(
-        settings.answer_model, key, settings.answer_generation_timeout_seconds
+        settings.answer_model,
+        key,
+        settings.answer_generation_timeout_seconds,
+        str(settings.chat_api_base_url) if settings.chat_api_base_url else None,
+        settings.chat_disable_thinking,
     )

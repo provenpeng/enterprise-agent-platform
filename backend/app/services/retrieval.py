@@ -24,6 +24,7 @@ async def search_knowledge_base(
     *,
     tenant_id: uuid.UUID,
     knowledge_base_id: uuid.UUID,
+    embedding_model: str,
     query: str,
     top_k: int,
     min_score: float,
@@ -64,6 +65,7 @@ async def search_knowledge_base(
             KnowledgeBase.tenant_id == tenant_id,
             Document.active_index_version == Chunk.index_version,
             Chunk.embedding.is_not(None),
+            Chunk.metadata_["embedding_model"].astext == embedding_model,
         )
         .cte("authorized_chunks")
         .prefix_with("MATERIALIZED", dialect="postgresql")

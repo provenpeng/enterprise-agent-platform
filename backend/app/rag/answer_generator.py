@@ -7,6 +7,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.llm.structured_output import (
+    StructuredOutputMethod,
+    json_mode_instruction,
+    structured_chain,
+)
 from app.schemas.retrieval import SearchHit
 
 
@@ -30,8 +35,9 @@ class LangChainAnswerGenerator:
         timeout_seconds: float,
         base_url: str | None = None,
         disable_thinking: bool = False,
+        structured_output_method: StructuredOutputMethod = "json_schema",
     ) -> None:
-        self._chain = ChatOpenAI(
+        chat = ChatOpenAI(
             model=model,
             api_key=api_key,
             base_url=base_url,
@@ -40,7 +46,13 @@ class LangChainAnswerGenerator:
             temperature=0,
             max_tokens=512,
             extra_body={"thinking": {"type": "disabled"}} if disable_thinking else None,
-        ).with_structured_output(AnswerDraft, method="json_schema", strict=True)
+        )
+        self._chain = structured_chain(
+            chat, AnswerDraft, method=structured_output_method
+        )
+        self._format_instruction = json_mode_instruction(
+            AnswerDraft, structured_output_method
+        )
 
     async def generate(self, question: str, hits: list[SearchHit]) -> AnswerDraft:
         evidence = [
@@ -64,6 +76,7 @@ class LangChainAnswerGenerator:
                         "that directly support the answer. Do not invent facts or sources. "
                         "Do not put citation markers in the answer; the server adds them. "
                         "Respond in the same language as the question."
+                        + self._format_instruction
                     )
                 ),
                 HumanMessage(

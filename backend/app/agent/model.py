@@ -8,6 +8,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.llm.structured_output import (
+    StructuredOutputMethod,
+    json_mode_instruction,
+    structured_chain,
+)
 from app.schemas.business import OrderSnapshot
 from app.schemas.retrieval import SearchHit
 
@@ -73,6 +78,7 @@ class LangChainDiagnosticModel:
         timeout_seconds: float,
         base_url: str | None = None,
         disable_thinking: bool = False,
+        structured_output_method: StructuredOutputMethod = "json_schema",
     ) -> None:
         chat = ChatOpenAI(
             model=model,
@@ -84,11 +90,17 @@ class LangChainDiagnosticModel:
             max_tokens=512,
             extra_body={"thinking": {"type": "disabled"}} if disable_thinking else None,
         )
-        self._planner = chat.with_structured_output(
-            DiagnosticPlan, method="json_schema", strict=True, include_raw=True
+        self._planner = structured_chain(
+            chat, DiagnosticPlan, method=structured_output_method, include_raw=True
         )
-        self._explainer = chat.with_structured_output(
-            DiagnosticDraft, method="json_schema", strict=True, include_raw=True
+        self._explainer = structured_chain(
+            chat, DiagnosticDraft, method=structured_output_method, include_raw=True
+        )
+        self._plan_format_instruction = json_mode_instruction(
+            DiagnosticPlan, structured_output_method
+        )
+        self._draft_format_instruction = json_mode_instruction(
+            DiagnosticDraft, structured_output_method
         )
 
     async def plan(self, question: str) -> ModelCall[DiagnosticPlan]:
@@ -100,6 +112,7 @@ class LangChainDiagnosticModel:
                         "Set search_policy true when explaining refund failure, eligibility, "
                         "or recommended action requires knowledge-base rules. "
                         "For a status-only question set it false."
+                        + self._plan_format_instruction
                     )
                 ),
                 HumanMessage(content=question),
@@ -123,6 +136,7 @@ class LangChainDiagnosticModel:
                         "does not support an explanation, return an empty answer and no citations. "
                         "Never invent an order state or policy. Do not add citation markers; "
                         "the server adds them. Respond in the question's language."
+                        + self._draft_format_instruction
                     )
                 ),
                 HumanMessage(

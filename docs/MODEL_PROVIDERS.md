@@ -22,15 +22,16 @@ CHAT_API_KEY=ollama
 CHAT_API_BASE_URL=http://127.0.0.1:11434/v1
 ANSWER_MODEL=qwen2.5:1.5b-instruct
 CHAT_DISABLE_THINKING=false
+CHAT_STRUCTURED_OUTPUT_METHOD=json_schema
 ```
 
 如果 API 与 worker 在 Docker Compose 容器内运行，把两个 `127.0.0.1` 改为 `host.docker.internal`；容器中的 `127.0.0.1` 不指向宿主机。执行本地真实模型测试需在 `backend/` 安装 `.[test]` 依赖、启动 PostgreSQL，然后从仓库根目录运行：
 
 ```bash
-EAP_LIVE_OLLAMA=1 backend/.venv/bin/pytest -q backend/tests/test_live_ollama.py
+EAP_LIVE_MODELS=1 backend/.venv/bin/pytest -q backend/tests/test_live_model_pipeline.py
 ```
 
-该测试在临时数据库中创建租户知识库、上传示例规则，使用真实 Embedding 完成索引，并经过检索、结构化问答和诊断；默认测试套件会跳过它。`nomic-embed-text` 原生输出 768 维，服务将尾部补零至现有的 1536 维 pgvector 列。补零保持同一模型内的余弦距离；检索按保存的 Embedding 模型过滤，避免跨模型比较。
+该测试在临时数据库中创建租户知识库、上传示例规则，使用真实 Embedding 完成索引，并经过检索、结构化问答和诊断；聊天模型可以是 Ollama 或下述兼容服务，普通测试套件会跳过它。`nomic-embed-text` 原生输出 768 维，服务将尾部补零至现有的 1536 维 pgvector 列。补零保持同一模型内的余弦距离；检索按保存的 Embedding 模型过滤，避免跨模型比较。
 
 ## AIHubMix 免费聊天模型
 
@@ -43,6 +44,20 @@ CHAT_DISABLE_THINKING=true
 ```
 
 `CHAT_DISABLE_THINKING` 只应对支持 `thinking: {type: disabled}` 的兼容模型开启。实测该免费模型在默认推理模式下可能把 512 个输出 token 全部用于推理，导致 JSON Schema 回答为空；关闭推理后普通回答可返回。模型列表中的 `-free` 不保证当时有可用通道，也不保证严格 JSON Schema 遵从。AIHubMix 对未充值账户可能限制免费调用次数；本项目不会自动改用付费模型。
+
+## DeepSeek 聊天模型
+
+保持上述 Ollama Embedding 配置，将聊天配置改为：
+
+```dotenv
+CHAT_API_KEY=<your-deepseek-api-key>
+CHAT_API_BASE_URL=https://api.deepseek.com
+ANSWER_MODEL=deepseek-chat
+CHAT_STRUCTURED_OUTPUT_METHOD=json_mode
+CHAT_DISABLE_THINKING=false
+```
+
+实测 DeepSeek 当前拒绝严格 `json_schema` 响应格式并返回 HTTP 400，但接受 JSON object 模式。`json_mode` 会在提示中提供目标 Pydantic schema，模型输出仍经过解析和服务端引用 ID 校验。它是付费接口；上述真实链路测试只有在显式设置 `EAP_LIVE_MODELS=1` 时运行，不进入 CI。
 
 Embedding 独立配置。若继续用本地 Ollama Embedding，保留上述 `EMBEDDING_*` 配置；若使用另一种 Embedding 模型，应配置其实际原生维度。当前存储列上限为 1536 维，不支持更高维度的模型。
 

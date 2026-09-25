@@ -16,6 +16,6 @@ worker 领取任务时增加 `attempts`，设置租约，并将文档状态更�
 
 ## 模型与边界
 
-当前使用 `text-embedding-3-small` 的 1536 维输出、pgvector 存储和 HNSW 余弦索引。分片目标为 400 token、硬上限为 600 token，每个文档最多 1000 个分片，每批最多 32 个分片。worker 通过 `OPENAI_API_KEY` 访问模型；索引调用会产生模型费用。测试注入确定性的假 Embedding，不访问外部服务。
+默认使用 `text-embedding-3-small` 的 1536 维输出、pgvector 存储和 HNSW 余弦索引。OpenAI 兼容 Embedding 接口也可接入本地 Ollama；原生维度低于 1536 时补零，详情见 [模型接入](MODEL_PROVIDERS.md)。分片目标为 400 token、硬上限为 600 token，每个文档最多 1000 个分片，每批最多 32 个分片。worker 使用 `EMBEDDING_API_KEY`，未设置时回退到 `OPENAI_API_KEY`。普通测试注入确定性的假 Embedding，不访问外部服务。
 
-PDF 只处理可提取的文本，不提供 OCR。索引完成文档到向量的写入；知识库检索见 [检索设计](RETRIEVAL.md)，来源引用和问答会在后续独立 PR 中实现。
+PDF 只处理可提取的文本，不提供 OCR。索引完成文档到向量的写入；知识库检索见 [检索设计](RETRIEVAL.md)，引用与问答见 [问答设计](CITED_QA.md)。

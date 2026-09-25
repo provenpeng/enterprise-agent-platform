@@ -51,7 +51,7 @@ class FixedGenerator:
         )
 
 
-async def create_source(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
+async def create_source(client, sessions, space_id: str) -> tuple[uuid.UUID, uuid.UUID]:
     response = await client.post("/api/v1/knowledge-bases", json={"name": "Q&A"})
     assert response.status_code == 201
     knowledge_base_id = uuid.UUID(response.json()["id"])
@@ -78,6 +78,7 @@ async def create_source(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
             metadata_={
                 "section_path": ["政策", "退款"],
                 "embedding_model": "text-embedding-3-small",
+                "embedding_space_id": space_id,
             },
             embedding=[1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1),
         )
@@ -88,8 +89,10 @@ async def create_source(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
 
 @pytest.mark.asyncio
 async def test_ask_returns_server_verified_citation(api_client):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, chunk_id = await create_source(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
     embeddings, generator = FixedEmbeddings(), FixedGenerator()
     app.dependency_overrides[get_query_embeddings] = lambda: embeddings
     app.dependency_overrides[get_answer_generator] = lambda: generator
@@ -114,8 +117,10 @@ async def test_ask_returns_server_verified_citation(api_client):
 
 @pytest.mark.asyncio
 async def test_ask_abstains_without_evidence_or_valid_citations(api_client):
-    client, _, sessions, _ = api_client
-    knowledge_base_id, chunk_id = await create_source(client, sessions)
+    client, _, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
     embeddings, generator = FixedEmbeddings(), FixedGenerator()
     app.dependency_overrides[get_query_embeddings] = lambda: embeddings
     app.dependency_overrides[get_answer_generator] = lambda: generator
@@ -151,7 +156,9 @@ async def test_ask_abstains_without_evidence_or_valid_citations(api_client):
 @pytest.mark.asyncio
 async def test_ask_authorizes_before_model_calls_and_bounds_generation(api_client):
     client, _, sessions, settings = api_client
-    knowledge_base_id, _ = await create_source(client, sessions)
+    knowledge_base_id, _ = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
     embeddings, generator = FixedEmbeddings(), FixedGenerator(delay=0.05)
     app.dependency_overrides[get_query_embeddings] = lambda: embeddings
     app.dependency_overrides[get_answer_generator] = lambda: generator
@@ -185,8 +192,10 @@ async def test_ask_authorizes_before_model_calls_and_bounds_generation(api_clien
 
 @pytest.mark.asyncio
 async def test_ask_releases_db_connection_during_external_model_calls(api_client):
-    client, engine, sessions, _ = api_client
-    knowledge_base_id, _ = await create_source(client, sessions)
+    client, engine, sessions, settings = api_client
+    knowledge_base_id, _ = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
 
     class PoolCheckingEmbeddings(FixedEmbeddings):
         async def aembed_query(self, text: str) -> list[float]:

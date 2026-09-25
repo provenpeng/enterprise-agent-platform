@@ -36,7 +36,7 @@ async def search(
         embeddings,
         tenant_id=principal.tenant_id,
         knowledge_base_id=knowledge_base_id,
-        embedding_model=settings.embedding_model,
+        embedding_space_id=settings.embedding_space_id,
         query=payload.query,
         top_k=payload.top_k,
         min_score=payload.min_score,

@@ -24,6 +24,7 @@ def new_index_job(
         processing_backend=settings.document_processing_backend,
         processing_version=PROCESSING_VERSION,
         embedding_model=settings.embedding_model,
+        embedding_space_id=settings.embedding_space_id,
         target_tokens=settings.index_target_tokens,
         max_tokens=settings.index_max_tokens,
         max_chunks=settings.index_max_chunks,

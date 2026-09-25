@@ -5,6 +5,8 @@ from typing import Literal
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.rag.embedding_space import embedding_space_id
+
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
 
@@ -20,6 +22,7 @@ class Settings(BaseSettings):
     embedding_api_key: SecretStr | None = None
     embedding_api_base_url: AnyHttpUrl | None = None
     embedding_native_dimensions: int = Field(default=1536, ge=1, le=1536)
+    embedding_revision: str = Field(default="default", min_length=1, max_length=100)
     chat_api_key: SecretStr | None = None
     chat_api_base_url: AnyHttpUrl | None = None
     chat_disable_thinking: bool = False
@@ -51,6 +54,17 @@ class Settings(BaseSettings):
         if self.embedding_api_key and self.embedding_api_key.get_secret_value():
             return self.embedding_api_key
         return self.openai_api_key
+
+    @property
+    def embedding_space_id(self) -> str:
+        return embedding_space_id(
+            model=self.embedding_model,
+            base_url=str(self.embedding_api_base_url)
+            if self.embedding_api_base_url
+            else None,
+            native_dimensions=self.embedding_native_dimensions,
+            revision=self.embedding_revision,
+        )
 
     @field_validator("chat_api_base_url", "embedding_api_base_url", mode="before")
     @classmethod

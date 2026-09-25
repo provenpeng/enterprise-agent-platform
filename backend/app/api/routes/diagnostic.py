@@ -47,7 +47,7 @@ async def diagnose(
         DiagnosticOptions(
             tenant_id=principal.tenant_id,
             knowledge_base_id=knowledge_base_id,
-            embedding_model=settings.embedding_model,
+            embedding_space_id=settings.embedding_space_id,
             explicit_order_id=payload.order_id,
             planning_timeout_seconds=settings.diagnostic_planning_timeout_seconds,
             embedding_timeout_seconds=settings.retrieval_embedding_timeout_seconds,

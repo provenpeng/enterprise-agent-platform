@@ -28,6 +28,7 @@ class ClaimedJob:
     processing_backend: str
     processing_version: str
     embedding_model: str
+    embedding_space_id: str | None
     target_tokens: int
     max_tokens: int
     max_chunks: int
@@ -98,6 +99,7 @@ async def claim_index_job(
                     processing_backend=job.processing_backend,
                     processing_version=job.processing_version,
                     embedding_model=job.embedding_model,
+                    embedding_space_id=job.embedding_space_id,
                     target_tokens=job.target_tokens,
                     max_tokens=job.max_tokens,
                     max_chunks=job.max_chunks,
@@ -178,6 +180,7 @@ async def _publish_index(
                         "block_end": chunk.block_end,
                         "processing_backend": claim.processing_backend,
                         "embedding_model": claim.embedding_model,
+                        "embedding_space_id": claim.embedding_space_id,
                     },
                     embedding=vector,
                 )

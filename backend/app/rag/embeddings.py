@@ -5,6 +5,8 @@ import math
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
+from app.rag.embedding_space import DEFAULT_EMBEDDING_BASE_URL
+
 EMBEDDING_DIMENSIONS = 1536
 
 
@@ -68,7 +70,7 @@ def create_embeddings(
     delegate = OpenAIEmbeddings(
         model=model,
         api_key=api_key,
-        base_url=base_url,
+        base_url=base_url or DEFAULT_EMBEDDING_BASE_URL,
         request_timeout=timeout_seconds,
         max_retries=0,
         check_embedding_ctx_length=False,

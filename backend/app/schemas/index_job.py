@@ -15,6 +15,7 @@ class IndexJobRead(BaseModel):
     processing_backend: str
     processing_version: str
     embedding_model: str
+    embedding_space_id: str | None
     target_tokens: int
     max_tokens: int
     max_chunks: int

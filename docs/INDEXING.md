@@ -4,7 +4,7 @@
 
 上传接口将 `Document` 与第一个 `IndexJob` 写入同一数据库事务。原文件写入失败或数据库提交失败时，上传服务清理临时文件。独立 worker 使用 PostgreSQL `FOR UPDATE SKIP LOCKED` 领取到期任务；因此 API 重启不会丢失已提交的任务。
 
-任务记录创建时的解析后端与版本、Embedding 模型、tokenizer、分片限制、批量大小和目标索引版本。修改 `DOCUMENT_PROCESSING_BACKEND` 后，需重启 API 并调用 `POST /api/v1/documents/{id}/index-jobs` 创建新任务。已有任务继续使用其记录的处理参数。一个文档同一时间只允许一个待执行或运行中的任务。
+任务记录创建时的解析后端与版本、Embedding 模型及向量空间标识、tokenizer、分片限制、批量大小和目标索引版本。修改 `DOCUMENT_PROCESSING_BACKEND` 后，需重启 API 并调用 `POST /api/v1/documents/{id}/index-jobs` 创建新任务。已有任务继续使用其记录的处理参数。worker 会拒绝与当前 Embedding 空间不一致的任务，以免发布错误向量；空间变更时应重建任务。一个文档同一时间只允许一个待执行或运行中的任务。
 
 ## 执行与恢复
 
@@ -16,6 +16,6 @@ worker 领取任务时增加 `attempts`，设置租约，并将文档状态更�
 
 ## 模型与边界
 
-默认使用 `text-embedding-3-small` 的 1536 维输出和 pgvector 存储。当前检索先物化租户内已发布分片，再进行精确余弦排序；全局 HNSW 索引无法服务这条查询，因此不再维护。分片表的唯一索引已有 `(document_id, index_version, chunk_index)` 前缀，可满足按文档与版本读取，也不再重复维护同前缀的普通索引。OpenAI 兼容 Embedding 接口也可接入本地 Ollama；原生维度低于 1536 时补零，详情见 [模型接入](MODEL_PROVIDERS.md)。分片目标为 400 token、硬上限为 600 token，每个文档最多 1000 个分片，每批最多 32 个分片。worker 使用 `EMBEDDING_API_KEY`，未设置时回退到 `OPENAI_API_KEY`。普通测试注入确定性的假 Embedding，不访问外部服务。
+默认使用 `text-embedding-3-small` 的 1536 维输出和 pgvector 存储。当前检索先物化租户内已发布分片，再进行精确余弦排序；全局 HNSW 索引无法服务这条查询，因此不再维护。分片表的唯一索引已有 `(document_id, index_version, chunk_index)` 前缀，可满足按文档与版本读取，也不再重复维护同前缀的普通索引。OpenAI 兼容 Embedding 接口也可接入本地 Ollama；原生维度低于 1536 时补零，详情见 [模型接入](MODEL_PROVIDERS.md)。分片目标为 400 token、硬上限为 600 token，每个文档最多 1000 个分片，每批最多 32 个分片。worker 使用 `EMBEDDING_API_KEY`，未设置时回退到 `OPENAI_API_KEY`。普通测试注入确定性的假 Embedding，不访问外部服务。升级前的索引缺少可靠的向量空间标识，需要按[模型接入说明](MODEL_PROVIDERS.md)重建。
 
 PDF 只处理可提取的文本，不提供 OCR。索引完成文档到向量的写入；知识库检索见 [检索设计](RETRIEVAL.md)，引用与问答见 [问答设计](CITED_QA.md)。

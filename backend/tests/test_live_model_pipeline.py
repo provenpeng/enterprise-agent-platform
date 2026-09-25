@@ -1,4 +1,4 @@
-"""Opt-in, real local-model exercise of indexing, retrieval and Agent routing."""
+"""Opt-in exercise of Ollama embeddings and a real compatible chat model."""
 
 import os
 import uuid
@@ -15,11 +15,11 @@ from app.services.indexer import process_one_index_job
 
 
 @pytest.mark.skipif(
-    os.getenv("EAP_LIVE_OLLAMA") != "1",
-    reason="Run explicitly with local Ollama models and provider settings",
+    os.getenv("EAP_LIVE_MODELS") != "1",
+    reason="Run explicitly with Ollama embeddings and a configured chat model",
 )
 @pytest.mark.asyncio
-async def test_local_ollama_rag_and_diagnosis(api_client) -> None:
+async def test_live_model_rag_and_diagnosis(api_client) -> None:
     client, _, sessions, settings = api_client
     local_settings = get_settings()
     for name in (
@@ -30,6 +30,7 @@ async def test_local_ollama_rag_and_diagnosis(api_client) -> None:
         "chat_api_key",
         "chat_api_base_url",
         "chat_disable_thinking",
+        "chat_structured_output_method",
         "answer_model",
     ):
         setattr(settings, name, getattr(local_settings, name))

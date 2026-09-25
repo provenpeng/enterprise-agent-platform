@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     chat_api_key: SecretStr | None = None
     chat_api_base_url: AnyHttpUrl | None = None
     chat_disable_thinking: bool = False
+    chat_structured_output_method: Literal["json_schema", "json_mode"] = "json_schema"
     embedding_model: str = Field(
         default="text-embedding-3-small", min_length=1, max_length=100
     )

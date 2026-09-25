@@ -5,6 +5,7 @@ from pydantic import SecretStr
 from app.agent import model as diagnostic_module
 from app.api import answer_provider, diagnostic_provider
 from app.core.config import Settings
+from app.llm.structured_output import json_mode_instruction, structured_chain
 from app.rag import answer_generator as answer_module
 
 
@@ -75,6 +76,38 @@ def test_gateway_credentials_are_used_by_both_api_providers(monkeypatch) -> None
     answer_provider.get_answer_generator(object(), settings)
     diagnostic_provider.get_diagnostic_model(object(), settings)
     assert calls == [
-        ("free-model", "gateway-key", 30, "https://aihubmix.com/v1", True),
-        ("free-model", "gateway-key", 30, "https://aihubmix.com/v1", True),
+        (
+            "free-model",
+            "gateway-key",
+            30,
+            "https://aihubmix.com/v1",
+            True,
+            "json_schema",
+        ),
+        (
+            "free-model",
+            "gateway-key",
+            30,
+            "https://aihubmix.com/v1",
+            True,
+            "json_schema",
+        ),
     ]
+
+
+def test_json_mode_omits_unsupported_strict_schema_parameter() -> None:
+    calls = []
+
+    class FakeChat:
+        def with_structured_output(self, *args, **kwargs):
+            calls.append((args, kwargs))
+            return object()
+
+    chat = FakeChat()
+    structured_chain(chat, answer_module.AnswerDraft, method="json_mode")
+    assert calls[0][1] == {"method": "json_mode", "include_raw": False}
+    assert "cited_chunk_ids" in json_mode_instruction(
+        answer_module.AnswerDraft, "json_mode"
+    )
+    structured_chain(chat, answer_module.AnswerDraft, method="json_schema")
+    assert calls[1][1]["strict"] is True

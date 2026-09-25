@@ -5,9 +5,9 @@ Revises: 0009_demo_business
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 revision = "0010_agent_runs"
 down_revision = "0009_demo_business"

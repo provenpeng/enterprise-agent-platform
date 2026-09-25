@@ -3,13 +3,16 @@ from collections.abc import Callable
 
 from app.rag.types import ChunkCandidate, ParsedBlock, ParsedDocument
 
-
 _SENTENCE_END = re.compile(r"(?<=[.!?。！？])\s*")
 
 
 class StructureAwareChunker:
     def __init__(
-        self, *, target_tokens: int, max_tokens: int, token_counter: Callable[[str], int]
+        self,
+        *,
+        target_tokens: int,
+        max_tokens: int,
+        token_counter: Callable[[str], int],
     ) -> None:
         if not 0 < target_tokens <= max_tokens:
             raise ValueError("Expected 0 < target_tokens <= max_tokens")
@@ -67,7 +70,9 @@ class StructureAwareChunker:
     def _split_paragraph(self, text: str) -> list[str]:
         parts: list[str] = []
         current = ""
-        for sentence in filter(None, (part.strip() for part in _SENTENCE_END.split(text))):
+        for sentence in filter(
+            None, (part.strip() for part in _SENTENCE_END.split(text))
+        ):
             if self._count(sentence) > self.max_tokens:
                 if current:
                     parts.append(current)
@@ -131,7 +136,13 @@ class StructureAwareChunker:
             if self._count(block.text) > self.max_tokens:
                 flush()
                 for part in self._split_paragraph(block.text):
-                    emit(part, block.section_path, block.order, block.order, block.page_number)
+                    emit(
+                        part,
+                        block.section_path,
+                        block.order,
+                        block.order,
+                        block.page_number,
+                    )
                 continue
 
             if pending and not self._append_fits(

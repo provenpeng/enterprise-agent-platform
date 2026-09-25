@@ -13,7 +13,9 @@ async def test_health_succeeds_when_database_responds() -> None:
     db = AsyncMock()
     app.dependency_overrides[get_db] = lambda: db
     try:
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
             response = await client.get("/api/v1/health")
     finally:
         app.dependency_overrides.clear()
@@ -26,10 +28,14 @@ async def test_health_succeeds_when_database_responds() -> None:
 @pytest.mark.asyncio
 async def test_health_returns_503_when_database_is_unavailable() -> None:
     db = AsyncMock()
-    db.execute.side_effect = OperationalError("SELECT 1", {}, Exception("connection refused"))
+    db.execute.side_effect = OperationalError(
+        "SELECT 1", {}, Exception("connection refused")
+    )
     app.dependency_overrides[get_db] = lambda: db
     try:
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
             response = await client.get("/api/v1/health")
     finally:
         app.dependency_overrides.clear()

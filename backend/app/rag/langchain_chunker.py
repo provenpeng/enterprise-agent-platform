@@ -10,7 +10,11 @@ from app.rag.types import ChunkCandidate, ParsedDocument
 
 class LangChainChunker:
     def __init__(
-        self, *, target_tokens: int, max_tokens: int, token_counter: Callable[[str], int]
+        self,
+        *,
+        target_tokens: int,
+        max_tokens: int,
+        token_counter: Callable[[str], int],
     ) -> None:
         if not 0 < target_tokens <= max_tokens:
             raise ValueError("Expected 0 < target_tokens <= max_tokens")

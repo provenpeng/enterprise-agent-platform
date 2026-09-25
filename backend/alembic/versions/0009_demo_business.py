@@ -5,9 +5,9 @@ Revises: 0008_tenants
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 revision = "0009_demo_business"
 down_revision = "0008_tenants"

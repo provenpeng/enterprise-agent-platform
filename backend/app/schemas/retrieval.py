@@ -1,9 +1,9 @@
 """Public retrieval request and stable source metadata."""
 
 import uuid
+from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
-from typing import Annotated
 
 
 class SearchRequest(BaseModel):

@@ -4,6 +4,7 @@ import asyncio
 import uuid
 
 import pytest
+from conftest import make_token
 from langchain_core.embeddings import Embeddings
 from sqlalchemy import select, text
 
@@ -13,12 +14,11 @@ from app.api.embedding_provider import get_query_embeddings
 from app.business.demo_seed import seed_demo_orders
 from app.business.orders import OrderLookupTool
 from app.main import app
-from app.models.chunk import Chunk
 from app.models.agent_run import AgentRun, AgentRunStatus, AgentRunStep
+from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
 from app.models.tenant import Tenant
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
-from conftest import make_token
 
 
 class FixedEmbeddings(Embeddings):
@@ -143,8 +143,10 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
         "retrieve_policy",
         "compose",
     ]
-    assert trace["steps"][1]["output_data"]["order"]["order_id"] == "DEMO-WINDOW"
+    assert trace["steps"][1]["output_data"]["order_id"] == "DEMO-WINDOW"
     assert trace["steps"][2]["output_data"]["hits"][0]["chunk_id"] == str(chunk_id)
+    assert "content" not in trace["steps"][2]["output_data"]["hits"][0]
+    assert "answer" not in trace["steps"][3]["output_data"]
     assert trace["steps"][3]["total_tokens"] == 32
     assert (
         await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=viewer)

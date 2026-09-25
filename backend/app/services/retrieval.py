@@ -15,7 +15,6 @@ from app.rag.embeddings import validate_embedding
 from app.schemas.retrieval import SearchHit
 from app.services.errors import UpstreamUnavailable
 
-
 logger = logging.getLogger(__name__)
 
 

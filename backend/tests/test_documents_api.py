@@ -32,7 +32,10 @@ async def test_create_list_and_get_knowledge_base(api_client) -> None:
     listed = await client.get("/api/v1/knowledge-bases")
     fetched = await client.get(f"/api/v1/knowledge-bases/{knowledge_base_id}")
     assert listed.status_code == 200
-    assert {item["id"] for item in listed.json()} == {knowledge_base_id, second.json()["id"]}
+    assert {item["id"] for item in listed.json()} == {
+        knowledge_base_id,
+        second.json()["id"],
+    }
     assert fetched.status_code == 200
     assert fetched.json() == created.json()
 
@@ -64,12 +67,17 @@ async def test_upload_txt_and_reject_same_checksum(api_client) -> None:
     assert body["checksum"] == hashlib.sha256(content).hexdigest()
     assert body["file_type"] == "text/plain"
     assert "storage_uri" not in body
-    stored_file = Path(settings.upload_dir) / knowledge_base_id / body["id"] / "original.txt"
+    stored_file = (
+        Path(settings.upload_dir) / knowledge_base_id / body["id"] / "original.txt"
+    )
     assert stored_file.read_bytes() == content
     async with session_factory() as session:
         stored_document = await session.get(Document, uuid.UUID(body["id"]))
         assert stored_document is not None
-        assert stored_document.storage_uri == f"{knowledge_base_id}/{body['id']}/original.txt"
+        assert (
+            stored_document.storage_uri
+            == f"{knowledge_base_id}/{body['id']}/original.txt"
+        )
 
     listed = await client.get(upload_url)
     fetched = await client.get(f"/api/v1/documents/{body['id']}")
@@ -129,17 +137,24 @@ async def test_upload_pdf_and_markdown(api_client) -> None:
 
     first_page = await client.get(f"{upload_url}?limit=1&offset=0")
     second_page = await client.get(f"{upload_url}?limit=1&offset=1")
-    assert {first_page.json()[0]["id"], second_page.json()[0]["id"]} == set(uploaded_ids)
+    assert {first_page.json()[0]["id"], second_page.json()[0]["id"]} == set(
+        uploaded_ids
+    )
     assert (await client.get(f"{upload_url}?limit=101")).status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_upload_does_not_hold_transaction_during_file_io(api_client, monkeypatch) -> None:
+async def test_upload_does_not_hold_transaction_during_file_io(
+    api_client, monkeypatch
+) -> None:
     client, engine, session_factory, settings = api_client
     knowledge_base_id = uuid.UUID(
-        (await client.post("/api/v1/knowledge-bases", json={"name": "Transactions"})).json()["id"]
+        (
+            await client.post("/api/v1/knowledge-bases", json={"name": "Transactions"})
+        ).json()["id"]
     )
     async with session_factory() as session:
+
         class CheckedUpload(UploadFile):
             async def read(self, size: int = -1) -> bytes:
                 assert not session.in_transaction()
@@ -173,18 +188,26 @@ async def test_upload_validation_and_missing_knowledge_base(api_client) -> None:
     upload_url = f"/api/v1/knowledge-bases/{knowledge_base_id}/documents"
 
     assert (
-        await client.post(upload_url, files={"file": ("bad.exe", b"bad", "application/octet-stream")})
+        await client.post(
+            upload_url, files={"file": ("bad.exe", b"bad", "application/octet-stream")}
+        )
     ).status_code == 415
     assert (
-        await client.post(upload_url, files={"file": ("bad.pdf", b"not a pdf", "application/pdf")})
+        await client.post(
+            upload_url, files={"file": ("bad.pdf", b"not a pdf", "application/pdf")}
+        )
     ).status_code == 415
     assert (
-        await client.post(upload_url, files={"file": ("bad.txt", b"text", "application/pdf")})
+        await client.post(
+            upload_url, files={"file": ("bad.txt", b"text", "application/pdf")}
+        )
     ).status_code == 415
 
     settings.max_upload_size_bytes = 3
     assert (
-        await client.post(upload_url, files={"file": ("big.txt", b"four", "text/plain")})
+        await client.post(
+            upload_url, files={"file": ("big.txt", b"four", "text/plain")}
+        )
     ).status_code == 413
     assert (
         await client.post(
@@ -199,12 +222,16 @@ async def test_upload_validation_and_missing_knowledge_base(api_client) -> None:
 async def test_database_failure_removes_saved_file(api_client) -> None:
     client, engine, session_factory, settings = api_client
     knowledge_base_id = uuid.UUID(
-        (await client.post("/api/v1/knowledge-bases", json={"name": "Failure"})).json()["id"]
+        (await client.post("/api/v1/knowledge-bases", json={"name": "Failure"})).json()[
+            "id"
+        ]
     )
     async with engine.begin() as connection:
         await connection.execute(
-            text("ALTER TABLE documents ADD CONSTRAINT ck_test_reject_upload "
-                 "CHECK (filename <> 'db-fail.txt')")
+            text(
+                "ALTER TABLE documents ADD CONSTRAINT ck_test_reject_upload "
+                "CHECK (filename <> 'db-fail.txt')"
+            )
         )
 
     upload = UploadFile(

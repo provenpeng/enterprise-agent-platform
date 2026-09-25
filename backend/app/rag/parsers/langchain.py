@@ -5,7 +5,6 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter
 
 from app.rag.types import ParsedBlock, ParsedDocument
 
-
 _HEADERS = [("#" * level, f"h{level}") for level in range(1, 7)]
 
 

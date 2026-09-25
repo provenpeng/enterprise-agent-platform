@@ -50,7 +50,11 @@ jobs:
         run: python -m pip install -e '.[test]'
       - name: Apply migrations
         run: alembic upgrade head
+      - name: Check migration drift
+        run: alembic check
       - name: Check Python code
-        run: ruff check app tests
+        run: ruff check app tests scripts alembic
+      - name: Check Python formatting
+        run: ruff format --check app tests scripts alembic
       - name: Run tests
         run: pytest -q

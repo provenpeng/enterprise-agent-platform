@@ -11,9 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.models.document import DocumentStatus
-from app.rag.processing import PROCESSING_VERSION, create_document_processor
 from app.rag.embeddings import validate_embedding
+from app.rag.processing import PROCESSING_VERSION, create_document_processor
 from app.services.errors import PermanentIndexError
+from app.services.index_jobs import TOKENIZER_NAME
 from app.services.index_store import (
     ClaimedJob,
     LeaseLost,
@@ -22,8 +23,6 @@ from app.services.index_store import (
     _renew_and_set_phase,
     claim_index_job,
 )
-from app.services.index_jobs import TOKENIZER_NAME
-
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")

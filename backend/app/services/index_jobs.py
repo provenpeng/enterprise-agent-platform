@@ -11,7 +11,6 @@ from app.models.index_job import IndexJob, IndexJobStatus
 from app.rag.processing import PROCESSING_VERSION
 from app.services.errors import Conflict, NotFound
 
-
 TOKENIZER_NAME = "cl100k_base"
 
 

@@ -17,7 +17,6 @@ from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
 from app.schemas.knowledge_base import KnowledgeBaseCreate, KnowledgeBaseRead
 
-
 router = APIRouter(prefix="/knowledge-bases", tags=["knowledge-bases"])
 
 

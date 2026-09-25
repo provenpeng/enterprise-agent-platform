@@ -2,7 +2,6 @@ from typing import Protocol, TypeVar
 
 from app.rag.types import ChunkCandidate, ParsedDocument
 
-
 SourceT = TypeVar("SourceT", contravariant=True)
 
 

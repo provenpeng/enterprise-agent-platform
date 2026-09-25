@@ -1,9 +1,9 @@
 """JWT validation and resource ownership apply to every protected route."""
 
-import pytest
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from conftest import make_token
 
 

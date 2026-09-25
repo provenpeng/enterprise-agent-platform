@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import perf_counter
-from typing import AsyncIterator, Any
+from typing import Any, AsyncIterator
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession

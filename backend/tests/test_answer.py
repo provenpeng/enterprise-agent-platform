@@ -4,6 +4,7 @@ import asyncio
 import uuid
 
 import pytest
+from conftest import make_token
 from langchain_core.embeddings import Embeddings
 
 from app.api.answer_provider import get_answer_generator
@@ -16,7 +17,6 @@ from app.models.tenant import Tenant
 from app.rag.answer_generator import AnswerDraft
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
 from app.services.answer import NO_ANSWER
-from conftest import make_token
 
 
 class FixedEmbeddings(Embeddings):
@@ -178,3 +178,29 @@ async def test_ask_authorizes_before_model_calls_and_bounds_generation(api_clien
     assert (
         await client.post(path, json={"query": "policy", "top_k": 11})
     ).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_ask_releases_db_connection_during_external_model_calls(api_client):
+    client, engine, sessions, _ = api_client
+    knowledge_base_id, _ = await create_source(client, sessions)
+
+    class PoolCheckingEmbeddings(FixedEmbeddings):
+        async def aembed_query(self, text: str) -> list[float]:
+            assert engine.pool.checkedout() == 0
+            return await super().aembed_query(text)
+
+    class PoolCheckingGenerator(FixedGenerator):
+        async def generate(self, question: str, hits: list) -> AnswerDraft:
+            assert engine.pool.checkedout() == 0
+            return await super().generate(question, hits)
+
+    embeddings, generator = PoolCheckingEmbeddings(), PoolCheckingGenerator()
+    app.dependency_overrides[get_query_embeddings] = lambda: embeddings
+    app.dependency_overrides[get_answer_generator] = lambda: generator
+    response = await client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/ask",
+        json={"query": "谁批准退款？"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["grounded"] is True

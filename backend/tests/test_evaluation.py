@@ -7,7 +7,6 @@ from langchain_core.messages import AIMessage
 from app.agent.model import DiagnosticPlan, _model_call
 from app.evaluation.score import fraction, load_dataset, retrieval_hit, score_diagnostic
 
-
 DATASET = Path(__file__).resolve().parents[1] / "evals" / "demo_cases.json"
 
 
@@ -45,7 +44,13 @@ def test_scores_require_actual_retrieval_tool_route_and_relevant_citation() -> N
     assert score_diagnostic(case, response, steps[:-1])["policy_route"] is False
     retrieval = dataset.retrieval[0]
     assert retrieval_hit(retrieval, [{"content": retrieval.relevant_text}]) is True
-    assert retrieval_hit(retrieval, [{"content": "rule body", "section_path": [retrieval.relevant_text]}]) is True
+    assert (
+        retrieval_hit(
+            retrieval,
+            [{"content": "rule body", "section_path": [retrieval.relevant_text]}],
+        )
+        is True
+    )
     assert retrieval_hit(retrieval, [{"content": "unrelated"}]) is False
     assert fraction([True, False, True, True]) == 0.75
 

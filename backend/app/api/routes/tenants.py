@@ -11,7 +11,6 @@ from app.db.session import get_db
 from app.models.tenant import Tenant
 from app.schemas.tenant import TenantCreate, TenantRead
 
-
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 

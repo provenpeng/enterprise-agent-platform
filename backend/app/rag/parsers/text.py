@@ -10,7 +10,9 @@ class TextParser:
 
         def flush_paragraph() -> None:
             if paragraph:
-                blocks.append(ParsedBlock("\n".join(paragraph), "paragraph", len(blocks)))
+                blocks.append(
+                    ParsedBlock("\n".join(paragraph), "paragraph", len(blocks))
+                )
                 paragraph.clear()
 
         for line in text.splitlines():

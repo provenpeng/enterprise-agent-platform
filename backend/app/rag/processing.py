@@ -13,7 +13,6 @@ from app.rag.parsers.pdf import PdfParser
 from app.rag.parsers.text import TextParser
 from app.rag.types import ChunkCandidate, ParsedDocument
 
-
 ProcessingBackend = Literal["manual", "langchain"]
 PROCESSING_VERSION = "1"
 SourceT = TypeVar("SourceT")

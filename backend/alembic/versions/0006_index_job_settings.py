@@ -5,8 +5,8 @@ Revises: 0005_knowledge_base_owner
 """
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 
 revision = "0006_index_job_settings"
 down_revision = "0005_knowledge_base_owner"

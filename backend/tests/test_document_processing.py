@@ -3,7 +3,6 @@ import pytest
 from app.core.config import Settings
 from app.rag.processing import create_document_processor
 
-
 MARKDOWN = (
     "# Refund policy\n\nRequests are accepted within thirty days.\n\n"
     "## Final sale\n\nFinal sale orders cannot be refunded."

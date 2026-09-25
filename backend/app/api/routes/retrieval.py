@@ -15,7 +15,6 @@ from app.models.knowledge_base import KnowledgeBase
 from app.schemas.retrieval import SearchRequest, SearchResponse
 from app.services.retrieval import search_knowledge_base
 
-
 router = APIRouter(prefix="/knowledge-bases/{knowledge_base_id}", tags=["retrieval"])
 
 
@@ -29,6 +28,9 @@ async def search(
     embeddings: Annotated[Embeddings, Depends(get_query_embeddings)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> SearchResponse:
+    # Authorization has completed; release its read transaction before the
+    # network-bound embedding call. Retrieval opens a fresh scoped transaction.
+    await db.rollback()
     hits = await search_knowledge_base(
         db,
         embeddings,

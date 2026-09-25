@@ -4,14 +4,13 @@ import asyncio
 import logging
 import uuid
 
+from langchain_core.embeddings import Embeddings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.rag.answer_generator import AnswerGenerator
 from app.schemas.answer import AnswerCitation, AskResponse
 from app.services.errors import UpstreamUnavailable
 from app.services.retrieval import search_knowledge_base
-from langchain_core.embeddings import Embeddings
-
 
 logger = logging.getLogger(__name__)
 NO_ANSWER = "根据当前知识库资料，无法确定答案。"
@@ -40,6 +39,9 @@ async def answer_question(
         min_score=min_score,
         timeout_seconds=embedding_timeout_seconds,
     )
+    # Search results are DTOs; no database transaction is needed while the
+    # answer model runs, and the source IDs were already tenant scoped.
+    await db.rollback()
     if not hits:
         return AskResponse(
             knowledge_base_id=knowledge_base_id,

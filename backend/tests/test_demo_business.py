@@ -3,6 +3,7 @@
 import uuid
 
 import pytest
+from conftest import make_token
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -10,7 +11,6 @@ from app.business.demo_seed import DEMO_CASES, seed_demo_orders
 from app.business.orders import OrderLookupTool
 from app.models.demo_order import DemoOrder, DemoRefundAttempt, RefundStatus
 from app.models.tenant import Tenant
-from conftest import make_token
 
 
 @pytest.mark.asyncio

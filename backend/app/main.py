@@ -11,7 +11,6 @@ from app.services.errors import (
     UpstreamUnavailable,
 )
 
-
 app = FastAPI(title="Enterprise Agent Platform")
 
 

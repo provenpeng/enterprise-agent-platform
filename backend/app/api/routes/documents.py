@@ -14,15 +14,14 @@ from app.api.auth import (
 )
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
-from app.models.document import Document
 from app.models.chunk import Chunk
+from app.models.document import Document
 from app.models.index_job import IndexJob
-from app.schemas.document import DocumentRead
 from app.schemas.chunk import ActiveChunkRead
+from app.schemas.document import DocumentRead
 from app.schemas.index_job import IndexJobRead
 from app.services.document import upload_document
 from app.services.index_jobs import enqueue_reindex
-
 
 knowledge_base_documents_router = APIRouter(
     prefix="/knowledge-bases/{knowledge_base_id}/documents", tags=["documents"]

@@ -7,9 +7,9 @@ Revises: 0007_index_job_constraints
 import uuid
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
+from alembic import op
 
 revision = "0008_tenants"
 down_revision = "0007_index_job_constraints"

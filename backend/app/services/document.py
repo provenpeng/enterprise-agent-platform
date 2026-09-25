@@ -118,9 +118,14 @@ async def upload_document(
     knowledge_base_id: uuid.UUID,
     upload: UploadSource,
     settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
 ) -> Document:
     knowledge_base = await db.scalar(
-        select(KnowledgeBase.id).where(KnowledgeBase.id == knowledge_base_id)
+        select(KnowledgeBase.id).where(
+            KnowledgeBase.id == knowledge_base_id,
+            KnowledgeBase.tenant_id == tenant_id,
+        )
     )
     await db.rollback()
     if knowledge_base is None:

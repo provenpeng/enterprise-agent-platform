@@ -40,8 +40,9 @@ async def upload_knowledge_base_document(
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> Document:
     require_admin(principal)
-    await tenant_knowledge_base(db, knowledge_base_id, principal)
-    return await upload_document(db, knowledge_base_id, file, settings)
+    return await upload_document(
+        db, knowledge_base_id, file, settings, tenant_id=principal.tenant_id
+    )
 
 
 @knowledge_base_documents_router.get("", response_model=list[DocumentRead])
@@ -84,8 +85,9 @@ async def reindex_document(
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> IndexJob:
     require_admin(principal)
-    await tenant_document(db, document_id, principal)
-    return await enqueue_reindex(db, document_id, settings)
+    return await enqueue_reindex(
+        db, document_id, settings, tenant_id=principal.tenant_id
+    )
 
 
 @documents_router.get("/{document_id}/index-jobs", response_model=list[IndexJobRead])

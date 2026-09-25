@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.models.document import Document, DocumentStatus
 from app.models.index_job import IndexJob, IndexJobStatus
+from app.models.knowledge_base import KnowledgeBase
 from app.rag.processing import PROCESSING_VERSION
 from app.services.errors import Conflict, NotFound
 
@@ -32,10 +33,20 @@ def new_index_job(
 
 
 async def enqueue_reindex(
-    db: AsyncSession, document_id: uuid.UUID, settings: Settings
+    db: AsyncSession,
+    document_id: uuid.UUID,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
 ) -> IndexJob:
     document = await db.scalar(
-        select(Document).where(Document.id == document_id).with_for_update()
+        select(Document)
+        .join(KnowledgeBase, KnowledgeBase.id == Document.knowledge_base_id)
+        .where(
+            Document.id == document_id,
+            KnowledgeBase.tenant_id == tenant_id,
+        )
+        .with_for_update(of=Document)
     )
     if document is None:
         await db.rollback()

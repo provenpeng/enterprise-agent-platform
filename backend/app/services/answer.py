@@ -8,7 +8,8 @@ from langchain_core.embeddings import Embeddings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.rag.answer_generator import AnswerGenerator
-from app.schemas.answer import AnswerCitation, AskResponse
+from app.schemas.answer import AskResponse
+from app.services.citations import attach_verified_citations
 from app.services.errors import UpstreamUnavailable
 from app.services.retrieval import search_knowledge_base
 
@@ -63,13 +64,8 @@ async def answer_question(
         )
         raise UpstreamUnavailable("Answer generation is unavailable") from exc
 
-    authorized = {str(hit.chunk_id): hit for hit in hits}
-    cited_ids = list(dict.fromkeys(draft.cited_chunk_ids))
-    if (
-        not draft.answer.strip()
-        or not cited_ids
-        or any(chunk_id not in authorized for chunk_id in cited_ids)
-    ):
+    cited = attach_verified_citations(draft.answer, draft.cited_chunk_ids, hits)
+    if cited is None:
         logger.info(
             "Answer abstained or contained invalid citations for %s", knowledge_base_id
         )
@@ -80,14 +76,10 @@ async def answer_question(
             citations=[],
         )
 
-    citations = [
-        AnswerCitation(number=index, source=authorized[chunk_id])
-        for index, chunk_id in enumerate(cited_ids, start=1)
-    ]
-    markers = " ".join(f"[{citation.number}]" for citation in citations)
+    answer, citations = cited
     return AskResponse(
         knowledge_base_id=knowledge_base_id,
-        answer=f"{draft.answer.strip()}\n\n来源：{markers}",
+        answer=answer,
         grounded=True,
         citations=citations,
     )

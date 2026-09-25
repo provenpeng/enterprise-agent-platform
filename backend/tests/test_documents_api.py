@@ -175,7 +175,15 @@ async def test_upload_does_not_hold_transaction_during_file_io(
             return await real_to_thread(func, *args, **kwargs)
 
         monkeypatch.setattr(document_service.asyncio, "to_thread", checked_to_thread)
-        document = await upload_document(session, knowledge_base_id, upload, settings)
+        document = await upload_document(
+            session,
+            knowledge_base_id,
+            upload,
+            settings,
+            tenant_id=uuid.uuid5(
+                uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+            ),
+        )
         assert document.status == DocumentStatus.UPLOADED
 
 
@@ -241,7 +249,15 @@ async def test_database_failure_removes_saved_file(api_client) -> None:
     )
     async with session_factory() as session:
         with pytest.raises(IntegrityError):
-            await upload_document(session, knowledge_base_id, upload, settings)
+            await upload_document(
+                session,
+                knowledge_base_id,
+                upload,
+                settings,
+                tenant_id=uuid.uuid5(
+                    uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user"
+                ),
+            )
 
     assert not list(settings.upload_dir.rglob("*"))
     async with session_factory() as session:

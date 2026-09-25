@@ -71,7 +71,10 @@ async def create_corpus(client, sessions):
                 token_count=4,
                 page_number=3,
                 section_title="Refunds",
-                metadata_={"section_path": ["Policies", "Refunds"]},
+                metadata_={
+                    "section_path": ["Policies", "Refunds"],
+                    "embedding_model": "text-embedding-3-small",
+                },
                 embedding=vector(1),
             ),
             Chunk(
@@ -80,7 +83,7 @@ async def create_corpus(client, sessions):
                 chunk_index=0,
                 content="Approval timing",
                 token_count=2,
-                metadata_={},
+                metadata_={"embedding_model": "text-embedding-3-small"},
                 embedding=vector(0.8, 0.6),
             ),
             Chunk(
@@ -89,7 +92,7 @@ async def create_corpus(client, sessions):
                 chunk_index=0,
                 content="Superseded answer",
                 token_count=2,
-                metadata_={},
+                metadata_={"embedding_model": "text-embedding-3-small"},
                 embedding=vector(1),
             ),
             Chunk(
@@ -98,7 +101,16 @@ async def create_corpus(client, sessions):
                 chunk_index=0,
                 content="Unpublished answer",
                 token_count=2,
-                metadata_={},
+                metadata_={"embedding_model": "text-embedding-3-small"},
+                embedding=vector(1),
+            ),
+            Chunk(
+                document_id=documents[0].id,
+                index_version=2,
+                chunk_index=1,
+                content="Same dimension, different embedding space",
+                token_count=6,
+                metadata_={"embedding_model": "other-model"},
                 embedding=vector(1),
             ),
         ]

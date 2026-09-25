@@ -12,8 +12,8 @@
 
 ## 数据与隔离边界
 
-查询只读取所请求租户和知识库的文档，且只读取 `Document.active_index_version` 指向的分片。尚未发布或已被新版本替代的分片不会出现。重建失败时活动版本仍可检索。SQL 使用 PostgreSQL `MATERIALIZED` CTE 先筛出授权的活动分片，再做精确余弦距离排序和 Top-K，防止全局 ANN 候选集经过租户过滤后数量不足。代价是大知识库检索时需要计算其全部活动向量的距离；将来若引入分区或租户内 ANN，需要用同一套租户、版本和 Recall@K 测试验证结果。
+查询只读取所请求租户和知识库的文档，且只读取 `Document.active_index_version` 指向、由当前 Embedding 模型生成的分片。尚未发布、已被新版本替代或使用其他向量空间的分片不会出现。重建失败时活动版本仍保留；若此时已切换 Embedding 模型，需要恢复原模型配置才能检索旧版本。SQL 使用 PostgreSQL `MATERIALIZED` CTE 先筛出授权的活动分片，再做精确余弦距离排序和 Top-K，防止全局 ANN 候选集经过租户过滤后数量不足。代价是大知识库检索时需要计算其全部活动向量的距离；将来若引入分区或租户内 ANN，需要用同一套租户、版本和 Recall@K 测试验证结果。
 
-查询 Embedding 与索引使用相同的 1536 维 `text-embedding-3-small` 配置。API 进程需要 `OPENAI_API_KEY`；未配置、超时或模型返回无效向量时返回 503。API 使用独立的 `RETRIEVAL_EMBEDDING_TIMEOUT_SECONDS`（默认 15 秒），不影响 worker 的索引超时。服务端日志记录故障，响应不会泄露供应商异常或密钥。
+查询 Embedding 与索引使用相同的模型和原生维度配置，统一转为 1536 维存储向量。API 进程需要 `EMBEDDING_API_KEY` 或默认的 `OPENAI_API_KEY`；未配置、超时或模型返回无效向量时返回 503。API 使用独立的 `RETRIEVAL_EMBEDDING_TIMEOUT_SECONDS`（默认 15 秒），不影响 worker 的索引超时。服务端日志记录故障，响应不会泄露供应商异常或密钥。
 
 `backend/tests/test_retrieval.py` 用固定向量和真实 pgvector 数据库验证排序、阈值、Top-K、活动版本、未发布分片、跨租户授权、viewer 权限和供应商故障，不消耗模型额度。线上语义质量仍需有标注的真实查询集持续衡量；当前固定向量测试验证检索契约，不代表自然语言 Recall@K。

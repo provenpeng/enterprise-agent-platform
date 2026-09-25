@@ -75,7 +75,10 @@ async def create_source(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
             token_count=5,
             page_number=2,
             section_title="退款",
-            metadata_={"section_path": ["政策", "退款"]},
+            metadata_={
+                "section_path": ["政策", "退款"],
+                "embedding_model": "text-embedding-3-small",
+            },
             embedding=[1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1),
         )
         db.add(chunk)

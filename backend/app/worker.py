@@ -4,11 +4,10 @@ import asyncio
 import logging
 
 import tiktoken
-from langchain_openai import OpenAIEmbeddings
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal, engine
-from app.rag.embeddings import EMBEDDING_DIMENSIONS
+from app.rag.embeddings import create_embeddings
 from app.services.index_jobs import TOKENIZER_NAME
 from app.services.indexer import process_one_index_job
 
@@ -17,14 +16,19 @@ logger = logging.getLogger(__name__)
 
 async def run_worker() -> None:
     settings = get_settings()
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required to run the indexing worker")
-    embeddings = OpenAIEmbeddings(
+    secret = settings.effective_embedding_api_key
+    if secret is None or not secret.get_secret_value():
+        raise RuntimeError(
+            "An embedding API key is required to run the indexing worker"
+        )
+    embeddings = create_embeddings(
         model=settings.embedding_model,
-        dimensions=EMBEDDING_DIMENSIONS,
-        api_key=settings.openai_api_key,
-        request_timeout=settings.index_embedding_timeout_seconds,
-        max_retries=0,
+        api_key=secret.get_secret_value(),
+        base_url=str(settings.embedding_api_base_url)
+        if settings.embedding_api_base_url
+        else None,
+        timeout_seconds=settings.index_embedding_timeout_seconds,
+        native_dimensions=settings.embedding_native_dimensions,
     )
     encoding = tiktoken.get_encoding(TOKENIZER_NAME)
 

@@ -22,14 +22,24 @@ class AnswerGenerator(Protocol):
 
 
 class LangChainAnswerGenerator:
-    def __init__(self, *, model: str, api_key: str, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        *,
+        model: str,
+        api_key: str,
+        timeout_seconds: float,
+        base_url: str | None = None,
+        disable_thinking: bool = False,
+    ) -> None:
         self._chain = ChatOpenAI(
             model=model,
             api_key=api_key,
+            base_url=base_url,
             timeout=timeout_seconds,
             max_retries=0,
             temperature=0,
             max_tokens=512,
+            extra_body={"thinking": {"type": "disabled"}} if disable_thinking else None,
         ).with_structured_output(AnswerDraft, method="json_schema", strict=True)
 
     async def generate(self, question: str, hits: list[SearchHit]) -> AnswerDraft:

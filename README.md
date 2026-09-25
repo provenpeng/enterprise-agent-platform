@@ -7,7 +7,7 @@
 | 能力 | 实现与边界 |
 | --- | --- |
 | 文档处理 | TXT、Markdown、文本型 PDF；手动实现与 LangChain 实现可按索引任务切换，输出相同的解析和分片契约 |
-| 持久化索引 | PostgreSQL 任务租约、失败重试、版本原子发布；pgvector 存储 1536 维 OpenAI Embedding |
+| 持久化索引 | PostgreSQL 任务租约、失败重试、版本原子发布；pgvector 存储 1536 维向量，支持 OpenAI 兼容 Embedding 接口 |
 | 租户隔离 | RS256 JWT 中的 `tenant_id` 决定访问范围；知识库、检索、订单和运行轨迹均按租户查询 |
 | 检索与问答 | 仅检索已发布版本；服务端校验引用 ID 是否属于本次授权结果，证据不足时拒答 |
 | 订单诊断 | LangGraph 固定路由、只读订单工具、步骤轨迹、token 用量与固定合成数据评测 |
@@ -30,7 +30,7 @@ flowchart LR
 
 ## 快速开始
 
-需要 Python 3.12、Docker Engine、Docker Compose v2 和 OpenSSL。以下命令在仓库根目录执行；`OPENAI_API_KEY` 在索引、检索、问答和诊断时需要。复制配置后，在本机编辑 `.env` 填入有效密钥；`.env` 和私钥已被 Git 忽略。
+需要 Python 3.12、Docker Engine、Docker Compose v2 和 OpenSSL。以下命令在仓库根目录执行；索引、检索、问答和诊断需要可用模型。默认配置使用 OpenAI API 密钥；也可按 [模型接入说明](docs/MODEL_PROVIDERS.md) 分别接入 Ollama 或其他兼容网关。复制配置后，在本机编辑 `.env`；`.env` 和私钥已被 Git 忽略。
 
 ```bash
 cp .env.example .env
@@ -99,7 +99,7 @@ CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查�
 
 ## 设计与限制
 
-- [产品范围](docs/PRODUCT_SPEC.md) · [租户隔离](docs/TENANCY.md) · [索引状态机](docs/INDEXING.md) · [检索](docs/RETRIEVAL.md) · [带引用问答](docs/CITED_QA.md) · [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)
+- [产品范围](docs/PRODUCT_SPEC.md) · [模型接入](docs/MODEL_PROVIDERS.md) · [租户隔离](docs/TENANCY.md) · [索引状态机](docs/INDEXING.md) · [检索](docs/RETRIEVAL.md) · [带引用问答](docs/CITED_QA.md) · [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)
 - PDF 只提取文本，不含 OCR。默认上传上限为 10 MiB；上传文件保存在共享卷。生产部署还应在入口网关限制请求体大小。
 - 引用校验确认来源属于本次授权检索结果，不能证明回答的每一句话在语义上成立。高风险结论仍需人工审核。
 - 运行轨迹包含原问题与最终回答；应限制管理员访问并按 [保留说明](docs/AGENT_TRACES_EVAL.md) 定期清理。

@@ -5,22 +5,27 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from langchain_core.embeddings import Embeddings
-from langchain_openai import OpenAIEmbeddings
 
 from app.api.auth import authorized_knowledge_base
 from app.core.config import Settings, get_settings
 from app.models.knowledge_base import KnowledgeBase
-from app.rag.embeddings import EMBEDDING_DIMENSIONS
+from app.rag.embeddings import create_embeddings
 
 
 @lru_cache(maxsize=2)
-def _cached_embeddings(model: str, api_key: str, timeout_seconds: float) -> Embeddings:
-    return OpenAIEmbeddings(
+def _cached_embeddings(
+    model: str,
+    api_key: str,
+    base_url: str | None,
+    timeout_seconds: float,
+    native_dimensions: int,
+) -> Embeddings:
+    return create_embeddings(
         model=model,
-        dimensions=EMBEDDING_DIMENSIONS,
         api_key=api_key,
-        request_timeout=timeout_seconds,
-        max_retries=0,
+        base_url=base_url,
+        timeout_seconds=timeout_seconds,
+        native_dimensions=native_dimensions,
     )
 
 
@@ -28,11 +33,18 @@ def get_query_embeddings(
     _knowledge_base: Annotated[KnowledgeBase, Depends(authorized_knowledge_base)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Embeddings:
-    key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else ""
+    secret = settings.effective_embedding_api_key
+    key = secret.get_secret_value() if secret else ""
     if not key:
         raise HTTPException(
             status_code=503, detail="Query embeddings are not configured"
         )
     return _cached_embeddings(
-        settings.embedding_model, key, settings.retrieval_embedding_timeout_seconds
+        settings.embedding_model,
+        key,
+        str(settings.embedding_api_base_url)
+        if settings.embedding_api_base_url
+        else None,
+        settings.retrieval_embedding_timeout_seconds,
+        settings.embedding_native_dimensions,
     )

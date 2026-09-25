@@ -39,6 +39,7 @@ async def ask(
         generator,
         tenant_id=principal.tenant_id,
         knowledge_base_id=knowledge_base_id,
+        embedding_model=settings.embedding_model,
         question=payload.query,
         top_k=payload.top_k,
         min_score=payload.min_score,

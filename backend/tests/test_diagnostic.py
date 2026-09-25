@@ -93,7 +93,10 @@ async def create_context(client, sessions) -> tuple[uuid.UUID, uuid.UUID]:
             chunk_index=0,
             content="支付后 30 天内可申请退款。",
             token_count=10,
-            metadata_={"section_path": ["退款规则"]},
+            metadata_={
+                "section_path": ["退款规则"],
+                "embedding_model": "text-embedding-3-small",
+            },
             embedding=[1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1),
         )
         db.add(chunk)

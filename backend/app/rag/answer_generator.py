@@ -4,11 +4,10 @@ import json
 from typing import Protocol
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.llm.chat import ChatModelConfig, create_chat_model
 from app.llm.structured_output import (
-    StructuredOutputMethod,
     json_mode_instruction,
     structured_chain,
 )
@@ -27,31 +26,13 @@ class AnswerGenerator(Protocol):
 
 
 class LangChainAnswerGenerator:
-    def __init__(
-        self,
-        *,
-        model: str,
-        api_key: str,
-        timeout_seconds: float,
-        base_url: str | None = None,
-        disable_thinking: bool = False,
-        structured_output_method: StructuredOutputMethod = "json_schema",
-    ) -> None:
-        chat = ChatOpenAI(
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout_seconds,
-            max_retries=0,
-            temperature=0,
-            max_tokens=512,
-            extra_body={"thinking": {"type": "disabled"}} if disable_thinking else None,
-        )
+    def __init__(self, config: ChatModelConfig) -> None:
+        chat = create_chat_model(config)
         self._chain = structured_chain(
-            chat, AnswerDraft, method=structured_output_method
+            chat, AnswerDraft, method=config.structured_output_method
         )
         self._format_instruction = json_mode_instruction(
-            AnswerDraft, structured_output_method
+            AnswerDraft, config.structured_output_method
         )
 
     async def generate(self, question: str, hits: list[SearchHit]) -> AnswerDraft:

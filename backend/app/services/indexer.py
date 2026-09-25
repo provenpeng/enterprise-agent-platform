@@ -13,6 +13,7 @@ from app.core.config import Settings
 from app.models.document import DocumentStatus
 from app.rag.embeddings import validate_embedding
 from app.rag.processing import PROCESSING_VERSION, create_document_processor
+from app.rag.types import ChunkCandidate
 from app.services.errors import PermanentIndexError
 from app.services.index_jobs import TOKENIZER_NAME
 from app.services.index_store import (
@@ -80,6 +81,82 @@ def _validate_embeddings(vectors: list[list[float]], expected_count: int) -> Non
         validate_embedding(vector)
 
 
+def _check_job_compatibility(claim: ClaimedJob, settings: Settings) -> None:
+    if (
+        claim.embedding_model != settings.embedding_model
+        or claim.tokenizer_name != TOKENIZER_NAME
+        or claim.processing_version != PROCESSING_VERSION
+    ):
+        raise PermanentIndexError(
+            "Index job model, tokenizer, or processor version is unsupported"
+        )
+
+
+async def _parse_and_chunk(
+    sessions: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    claim: ClaimedJob,
+    source: bytes,
+    token_counter: Callable[[str], int],
+) -> list[ChunkCandidate]:
+    processor = create_document_processor(
+        backend=claim.processing_backend,
+        file_type=claim.file_type,
+        target_tokens=claim.target_tokens,
+        max_tokens=claim.max_tokens,
+        token_counter=token_counter,
+    )
+    try:
+        parser_input = (
+            source if claim.file_type == "application/pdf" else source.decode("utf-8")
+        )
+        parsed = await _with_lease_heartbeat(
+            asyncio.to_thread(processor.parse, parser_input),
+            sessions,
+            claim,
+            settings,
+            DocumentStatus.PARSING,
+        )
+    except (ValueError, UnicodeError) as exc:
+        raise PermanentIndexError("Document cannot be parsed") from exc
+
+    await _renew_and_set_phase(sessions, claim, settings, DocumentStatus.CHUNKING)
+    try:
+        chunks = await _with_lease_heartbeat(
+            asyncio.to_thread(processor.chunker.chunk, parsed),
+            sessions,
+            claim,
+            settings,
+            DocumentStatus.CHUNKING,
+        )
+    except ValueError as exc:
+        raise PermanentIndexError("Document cannot be chunked") from exc
+    if not chunks or len(chunks) > claim.max_chunks:
+        raise PermanentIndexError(
+            "Document has no chunks or exceeds the saved chunk limit"
+        )
+    return chunks
+
+
+async def _embed_chunks(
+    sessions: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    claim: ClaimedJob,
+    chunks: list[ChunkCandidate],
+    embeddings: Embeddings,
+) -> list[list[float]]:
+    vectors: list[list[float]] = []
+    for start in range(0, len(chunks), claim.embed_batch_size):
+        await _renew_and_set_phase(sessions, claim, settings, DocumentStatus.EMBEDDING)
+        batch = chunks[start : start + claim.embed_batch_size]
+        async with asyncio.timeout(settings.index_embedding_timeout_seconds):
+            vectors.extend(
+                await embeddings.aembed_documents([chunk.content for chunk in batch])
+            )
+    _validate_embeddings(vectors, len(chunks))
+    return vectors
+
+
 async def process_one_index_job(
     sessions: async_sessionmaker[AsyncSession],
     settings: Settings,
@@ -91,67 +168,12 @@ async def process_one_index_job(
         return False
 
     try:
-        if (
-            claim.embedding_model != settings.embedding_model
-            or claim.tokenizer_name != TOKENIZER_NAME
-            or claim.processing_version != PROCESSING_VERSION
-        ):
-            raise PermanentIndexError(
-                "Index job model, tokenizer, or processor version is unsupported"
-            )
+        _check_job_compatibility(claim, settings)
         source = await asyncio.to_thread(_read_source, settings, claim)
-        processor = create_document_processor(
-            backend=claim.processing_backend,
-            file_type=claim.file_type,
-            target_tokens=claim.target_tokens,
-            max_tokens=claim.max_tokens,
-            token_counter=token_counter,
+        chunks = await _parse_and_chunk(
+            sessions, settings, claim, source, token_counter
         )
-        try:
-            parsed = await _with_lease_heartbeat(
-                asyncio.to_thread(
-                    processor.parse,
-                    source
-                    if claim.file_type == "application/pdf"
-                    else source.decode("utf-8"),
-                ),
-                sessions,
-                claim,
-                settings,
-                DocumentStatus.PARSING,
-            )
-        except (ValueError, UnicodeError) as exc:
-            raise PermanentIndexError("Document cannot be parsed") from exc
-        await _renew_and_set_phase(sessions, claim, settings, DocumentStatus.CHUNKING)
-        try:
-            chunks = await _with_lease_heartbeat(
-                asyncio.to_thread(processor.chunker.chunk, parsed),
-                sessions,
-                claim,
-                settings,
-                DocumentStatus.CHUNKING,
-            )
-        except ValueError as exc:
-            raise PermanentIndexError("Document cannot be chunked") from exc
-        if not chunks or len(chunks) > claim.max_chunks:
-            raise PermanentIndexError(
-                "Document has no chunks or exceeds the saved chunk limit"
-            )
-        await _renew_and_set_phase(sessions, claim, settings, DocumentStatus.EMBEDDING)
-
-        vectors: list[list[float]] = []
-        for start in range(0, len(chunks), claim.embed_batch_size):
-            await _renew_and_set_phase(
-                sessions, claim, settings, DocumentStatus.EMBEDDING
-            )
-            batch = chunks[start : start + claim.embed_batch_size]
-            async with asyncio.timeout(settings.index_embedding_timeout_seconds):
-                vectors.extend(
-                    await embeddings.aembed_documents(
-                        [chunk.content for chunk in batch]
-                    )
-                )
-        _validate_embeddings(vectors, len(chunks))
+        vectors = await _embed_chunks(sessions, settings, claim, chunks, embeddings)
         await _publish_index(sessions, claim, chunks, vectors)
         logger.info(
             "Indexed document %s version %s", claim.document_id, claim.index_version

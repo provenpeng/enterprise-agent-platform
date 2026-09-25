@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.model import DiagnosticModel
 from app.agent.trace import RunRecorder
-from app.agent.workflow import diagnose_order
+from app.agent.workflow import DiagnosticOptions, DiagnosticWorkflow
 from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
@@ -39,17 +39,19 @@ async def diagnose(
         question=payload.question,
         model_name=settings.answer_model,
     )
-    return await diagnose_order(
+    workflow = DiagnosticWorkflow(
         db,
         embeddings,
         model,
         recorder,
-        tenant_id=principal.tenant_id,
-        knowledge_base_id=knowledge_base_id,
-        embedding_model=settings.embedding_model,
-        question=payload.question,
-        explicit_order_id=payload.order_id,
-        planning_timeout_seconds=settings.diagnostic_planning_timeout_seconds,
-        embedding_timeout_seconds=settings.retrieval_embedding_timeout_seconds,
-        generation_timeout_seconds=settings.answer_generation_timeout_seconds,
+        DiagnosticOptions(
+            tenant_id=principal.tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            embedding_model=settings.embedding_model,
+            explicit_order_id=payload.order_id,
+            planning_timeout_seconds=settings.diagnostic_planning_timeout_seconds,
+            embedding_timeout_seconds=settings.retrieval_embedding_timeout_seconds,
+            generation_timeout_seconds=settings.answer_generation_timeout_seconds,
+        ),
     )
+    return await workflow.run(payload.question)

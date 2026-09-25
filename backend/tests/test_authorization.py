@@ -2,9 +2,16 @@
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
 import pytest
 from conftest import make_token
+from fastapi import UploadFile
+from starlette.datastructures import Headers
+
+from app.services.document import upload_document
+from app.services.errors import NotFound
+from app.services.index_jobs import enqueue_reindex
 
 
 @pytest.mark.asyncio
@@ -85,6 +92,44 @@ async def test_knowledge_base_and_document_are_isolated_by_tenant(api_client) ->
         "/api/v1/knowledge-bases", json={"name": "Private"}, headers=other
     )
     assert own_name.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_write_services_enforce_tenant_scope_without_route_guards(
+    api_client,
+) -> None:
+    client, _, sessions, settings = api_client
+    created = await client.post(
+        "/api/v1/knowledge-bases", json={"name": "Service scope"}
+    )
+    knowledge_base_id = uuid.UUID(created.json()["id"])
+    uploaded = await client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/documents",
+        files={"file": ("owned.txt", b"owned", "text/plain")},
+    )
+    document_id = uuid.UUID(uploaded.json()["id"])
+    outsider_tenant = uuid.uuid4()
+    upload = UploadFile(
+        file=BytesIO(b"unauthorized"),
+        filename="denied.txt",
+        headers=Headers({"content-type": "text/plain"}),
+    )
+    stored_paths = set(settings.upload_dir.rglob("*"))
+    async with sessions() as db:
+        with pytest.raises(NotFound):
+            await upload_document(
+                db,
+                knowledge_base_id,
+                upload,
+                settings,
+                tenant_id=outsider_tenant,
+            )
+        with pytest.raises(NotFound):
+            await enqueue_reindex(db, document_id, settings, tenant_id=outsider_tenant)
+    assert upload.file.tell() == 0
+    assert set(settings.upload_dir.rglob("*")) == stored_paths
+    jobs = await client.get(f"/api/v1/documents/{document_id}/index-jobs")
+    assert len(jobs.json()) == 1
 
 
 @pytest.mark.asyncio

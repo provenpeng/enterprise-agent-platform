@@ -14,10 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agent.model import DiagnosticModel
 from app.agent.trace import RunRecorder
 from app.business.orders import OrderLookupTool
-from app.schemas.answer import AnswerCitation
 from app.schemas.business import OrderSnapshot
 from app.schemas.diagnostic import DiagnoseResponse
 from app.schemas.retrieval import SearchHit
+from app.services.citations import attach_verified_citations
 from app.services.errors import UpstreamUnavailable
 from app.services.retrieval import search_knowledge_base
 
@@ -179,13 +179,10 @@ async def diagnose_order(
                     ) from exc
                 trace.usage = call.usage
                 draft = call.value
-                authorized = {str(hit.chunk_id): hit for hit in hits}
-                cited_ids = list(dict.fromkeys(draft.cited_chunk_ids))
-                if (
-                    not draft.answer.strip()
-                    or not cited_ids
-                    or any(chunk_id not in authorized for chunk_id in cited_ids)
-                ):
+                cited = attach_verified_citations(
+                    draft.answer, draft.cited_chunk_ids, hits
+                )
+                if cited is None:
                     logger.info("Diagnostic explanation lacked valid policy citations")
                     response = DiagnoseResponse(
                         knowledge_base_id=knowledge_base_id,
@@ -195,15 +192,11 @@ async def diagnose_order(
                         citations=[],
                     )
                 else:
-                    citations = [
-                        AnswerCitation(number=index, source=authorized[chunk_id])
-                        for index, chunk_id in enumerate(cited_ids, start=1)
-                    ]
-                    markers = " ".join(f"[{citation.number}]" for citation in citations)
+                    answer, citations = cited
                     response = DiagnoseResponse(
                         knowledge_base_id=knowledge_base_id,
                         status="ANSWERED",
-                        answer=f"{draft.answer.strip()}\n\n来源：{markers}",
+                        answer=answer,
                         order=order,
                         citations=citations,
                     )

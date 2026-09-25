@@ -40,11 +40,17 @@ def _model_call(result: object, expected_type: type[T]) -> ModelCall[T]:
     raw = result.get("raw")
     metadata = getattr(raw, "usage_metadata", None)
     usage = None
-    if isinstance(metadata, dict):
+    fields = ("input_tokens", "output_tokens", "total_tokens")
+    if isinstance(metadata, dict) and all(
+        isinstance(metadata.get(field), int)
+        and not isinstance(metadata[field], bool)
+        and metadata[field] >= 0
+        for field in fields
+    ):
         usage = TokenUsage(
-            input_tokens=int(metadata["input_tokens"]),
-            output_tokens=int(metadata["output_tokens"]),
-            total_tokens=int(metadata["total_tokens"]),
+            input_tokens=metadata["input_tokens"],
+            output_tokens=metadata["output_tokens"],
+            total_tokens=metadata["total_tokens"],
         )
     return ModelCall(value=result["parsed"], usage=usage)
 

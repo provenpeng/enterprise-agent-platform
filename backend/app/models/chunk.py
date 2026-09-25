@@ -7,7 +7,6 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
-    Index,
     Integer,
     Text,
     UniqueConstraint,
@@ -37,13 +36,6 @@ class Chunk(Base):
         CheckConstraint(
             "page_number IS NULL OR page_number > 0",
             name="ck_chunks_page_number_positive",
-        ),
-        Index("ix_chunks_document_version", "document_id", "index_version"),
-        Index(
-            "ix_chunks_embedding_hnsw",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
 

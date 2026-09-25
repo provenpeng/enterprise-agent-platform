@@ -10,7 +10,6 @@ from app.business.orders import OrderLookupTool
 from app.db.session import get_db
 from app.schemas.business import OrderSnapshot
 
-
 router = APIRouter(prefix="/business/orders", tags=["demo-business"])
 
 

@@ -8,7 +8,6 @@ from pydantic import BaseModel, StringConstraints
 from app.schemas.answer import AnswerCitation
 from app.schemas.business import OrderSnapshot
 
-
 OrderId = Annotated[
     str,
     StringConstraints(

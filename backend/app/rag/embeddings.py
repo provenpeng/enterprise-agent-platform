@@ -2,7 +2,6 @@
 
 import math
 
-
 EMBEDDING_DIMENSIONS = 1536
 
 

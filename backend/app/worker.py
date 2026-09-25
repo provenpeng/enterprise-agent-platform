@@ -9,9 +9,8 @@ from langchain_openai import OpenAIEmbeddings
 from app.core.config import get_settings
 from app.db.session import SessionLocal, engine
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
-from app.services.indexer import process_one_index_job
 from app.services.index_jobs import TOKENIZER_NAME
-
+from app.services.indexer import process_one_index_job
 
 logger = logging.getLogger(__name__)
 

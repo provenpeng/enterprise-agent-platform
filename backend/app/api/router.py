@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
-    answer,
     agent_runs,
+    answer,
     business,
     diagnostic,
     documents,
@@ -11,7 +11,6 @@ from app.api.routes import (
     retrieval,
     tenants,
 )
-
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)

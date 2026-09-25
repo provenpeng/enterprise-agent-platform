@@ -15,7 +15,6 @@ from app.models.demo_order import (
 )
 from app.models.tenant import Tenant
 
-
 DEMO_TIMESTAMP = datetime(2026, 1, 2, 9, 0, tzinfo=timezone.utc)
 
 # All identifiers and values are fictitious. Each tenant gets its own rows.

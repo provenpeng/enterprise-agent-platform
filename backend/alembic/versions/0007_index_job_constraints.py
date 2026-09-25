@@ -6,7 +6,6 @@ Revises: 0006_index_job_settings
 
 from alembic import op
 
-
 revision = "0007_index_job_constraints"
 down_revision = "0006_index_job_settings"
 branch_labels = None

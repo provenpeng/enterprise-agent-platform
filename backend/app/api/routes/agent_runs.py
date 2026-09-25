@@ -13,7 +13,6 @@ from app.db.session import get_db
 from app.models.agent_run import AgentRun
 from app.schemas.agent_run import AgentRunDetail, AgentRunSummary
 
-
 router = APIRouter(prefix="/agent-runs", tags=["agent-runs"])
 
 

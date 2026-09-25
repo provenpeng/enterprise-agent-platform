@@ -29,30 +29,38 @@ def test_large_section_keeps_complete_paragraphs_and_respects_limit() -> None:
 
 
 def test_section_boundaries_and_metadata_are_preserved() -> None:
-    parsed = MarkdownParser().parse("# Policy\nIntro words.\n## A\nAlpha words.\n## B\nBeta words.")
+    parsed = MarkdownParser().parse(
+        "# Policy\nIntro words.\n## A\nAlpha words.\n## B\nBeta words."
+    )
 
     chunks = make_chunker().chunk(parsed)
 
     assert [chunk.section_path for chunk in chunks] == [
-        ("Policy",), ("Policy", "A"), ("Policy", "B"),
+        ("Policy",),
+        ("Policy", "A"),
+        ("Policy", "B"),
     ]
     assert [chunk.content for chunk in chunks] == [
-        "Intro words.", "Alpha words.", "Beta words.",
+        "Intro words.",
+        "Alpha words.",
+        "Beta words.",
     ]
     assert [(chunk.block_start, chunk.block_end) for chunk in chunks] == [
-        (1, 1), (3, 3), (5, 5),
+        (1, 1),
+        (3, 3),
+        (5, 5),
     ]
 
 
 def test_oversized_paragraph_splits_at_sentence_boundaries_first() -> None:
-    parsed = TextParser().parse(
-        "Alpha beta gamma. Delta epsilon zeta. Eta theta iota."
-    )
+    parsed = TextParser().parse("Alpha beta gamma. Delta epsilon zeta. Eta theta iota.")
 
     chunks = make_chunker(target=4, maximum=5).chunk(parsed)
 
     assert [chunk.content for chunk in chunks] == [
-        "Alpha beta gamma.", "Delta epsilon zeta.", "Eta theta iota.",
+        "Alpha beta gamma.",
+        "Delta epsilon zeta.",
+        "Eta theta iota.",
     ]
     assert all(chunk.token_count <= 5 for chunk in chunks)
     assert all((chunk.block_start, chunk.block_end) == (0, 0) for chunk in chunks)
@@ -65,7 +73,9 @@ def test_chinese_sentence_punctuation_is_a_boundary() -> None:
     chunks = chunker.chunk(parsed)
 
     assert [chunk.content for chunk in chunks] == [
-        "第一句内容。", "第二句内容！", "第三句内容？",
+        "第一句内容。",
+        "第二句内容！",
+        "第三句内容？",
     ]
 
 
@@ -90,7 +100,9 @@ def test_single_oversized_word_uses_character_fallback() -> None:
 
 
 def test_same_input_and_configuration_produce_identical_chunks() -> None:
-    parsed = MarkdownParser().parse("# A\n\nOne two three. Four five six. Seven eight nine.\n\nLast paragraph.")
+    parsed = MarkdownParser().parse(
+        "# A\n\nOne two three. Four five six. Seven eight nine.\n\nLast paragraph."
+    )
     chunker = make_chunker(target=4, maximum=5)
 
     first = chunker.chunk(parsed)

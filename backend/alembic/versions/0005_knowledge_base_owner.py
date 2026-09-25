@@ -5,8 +5,8 @@ Revises: 0004_chunk_vector_index
 """
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 
 revision = "0005_knowledge_base_owner"
 down_revision = "0004_chunk_vector_index"

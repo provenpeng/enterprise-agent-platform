@@ -2,7 +2,6 @@ import re
 
 from app.rag.types import ParsedBlock, ParsedDocument
 
-
 _HEADING = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.+?)\s*$")
 
 

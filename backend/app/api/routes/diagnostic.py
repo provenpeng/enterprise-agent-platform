@@ -8,8 +8,8 @@ from langchain_core.embeddings import Embeddings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.model import DiagnosticModel
-from app.agent.workflow import diagnose_order
 from app.agent.trace import RunRecorder
+from app.agent.workflow import diagnose_order
 from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
@@ -17,7 +17,6 @@ from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
 from app.schemas.diagnostic import DiagnoseRequest, DiagnoseResponse
-
 
 router = APIRouter(prefix="/knowledge-bases/{knowledge_base_id}", tags=["diagnostics"])
 

@@ -1,10 +1,10 @@
 """Verify externally issued JWTs and scope resources to their tenant."""
 
+import uuid
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
-import uuid
 
 import jwt
 from fastapi import Depends, HTTPException
@@ -17,7 +17,6 @@ from app.db.session import get_db
 from app.models.document import Document
 from app.models.knowledge_base import KnowledgeBase
 from app.models.tenant import Tenant
-
 
 bearer = HTTPBearer(auto_error=False)
 LEGACY_TENANT_ID = uuid.uuid5(

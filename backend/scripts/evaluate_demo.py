@@ -11,7 +11,6 @@ import httpx
 
 from app.evaluation.score import fraction, load_dataset, retrieval_hit, score_diagnostic
 
-
 DATASET = Path(__file__).resolve().parents[1] / "evals" / "demo_cases.json"
 
 

@@ -6,7 +6,6 @@ Revises: 0003_document_index_jobs
 
 from alembic import op
 
-
 revision = "0004_chunk_vector_index"
 down_revision = "0003_document_index_jobs"
 branch_labels = None

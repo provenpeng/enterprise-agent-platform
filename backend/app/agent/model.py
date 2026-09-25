@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from app.schemas.business import OrderSnapshot
 from app.schemas.retrieval import SearchHit
 
-
 T = TypeVar("T")
 
 

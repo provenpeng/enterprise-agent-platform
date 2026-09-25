@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.models.document import Document, DocumentStatus
 from app.models.knowledge_base import KnowledgeBase
-from app.services.index_jobs import new_index_job
 from app.services.errors import (
     Conflict,
     InvalidInput,
@@ -22,7 +21,7 @@ from app.services.errors import (
     PayloadTooLarge,
     UnsupportedMedia,
 )
-
+from app.services.index_jobs import new_index_job
 
 logger = logging.getLogger(__name__)
 READ_SIZE = 1024 * 1024

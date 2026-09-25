@@ -4,11 +4,11 @@ Revision ID: 0003_document_index_jobs
 Revises: 0002_document_checksum_unique
 """
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 from pgvector.sqlalchemy import Vector
+from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 revision = "0003_document_index_jobs"
 down_revision = "0002_document_checksum_unique"
@@ -17,8 +17,12 @@ depends_on = None
 
 
 job_status = postgresql.ENUM(
-    "PENDING", "RUNNING", "SUCCEEDED", "FAILED",
-    name="index_job_status", create_type=False,
+    "PENDING",
+    "RUNNING",
+    "SUCCEEDED",
+    "FAILED",
+    name="index_job_status",
+    create_type=False,
 )
 
 
@@ -35,18 +39,43 @@ def upgrade() -> None:
         sa.Column("embedding_model", sa.String(100), nullable=False),
         sa.Column("status", job_status, server_default="PENDING", nullable=False),
         sa.Column("attempts", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("next_attempt_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "next_attempt_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_error", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.CheckConstraint("index_version > 0", name="ck_index_jobs_version_positive"),
         sa.CheckConstraint("attempts >= 0", name="ck_index_jobs_attempts_nonnegative"),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("document_id", "index_version", name="uq_index_jobs_document_version"),
+        sa.UniqueConstraint(
+            "document_id", "index_version", name="uq_index_jobs_document_version"
+        ),
     )
-    op.create_index("ix_index_jobs_status_due", "document_index_jobs", ["status", "next_attempt_at", "created_at"])
-    op.create_index("ix_index_jobs_status_lease", "document_index_jobs", ["status", "lease_expires_at"])
+    op.create_index(
+        "ix_index_jobs_status_due",
+        "document_index_jobs",
+        ["status", "next_attempt_at", "created_at"],
+    )
+    op.create_index(
+        "ix_index_jobs_status_lease",
+        "document_index_jobs",
+        ["status", "lease_expires_at"],
+    )
 
 
 def downgrade() -> None:

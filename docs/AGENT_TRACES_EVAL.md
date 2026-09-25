@@ -2,7 +2,7 @@
 
 诊断接口返回 `run_id`。服务先提交一条 `RUNNING` 记录，再按 LangGraph 节点逐步持久化 `plan`、`lookup_order`、可选的 `retrieve_policy` 和 `compose`。每一步保存受限输入、输出、耗时、错误类型和模型报告的 token 用量；结束时将运行标记为 `SUCCEEDED` 或 `FAILED`。进程意外退出可能留下 `RUNNING` 记录，便于定位中断，不会伪装为成功。
 
-只有租户 `admin` 可以调用 `GET /api/v1/agent-runs` 和 `GET /api/v1/agent-runs/{run_id}`。跨租户 ID 统一返回 404；`viewer` 返回 403。轨迹包含原问题、虚构订单快照及检索片段，部署方应配置访问审计，并定期运行保留清理：
+只有租户 `admin` 可以调用 `GET /api/v1/agent-runs` 和 `GET /api/v1/agent-runs/{run_id}`。跨租户 ID 统一返回 404；`viewer` 返回 403。运行记录包含原问题和最终回答；步骤只保存订单编号、原因代码及检索命中的 ID、版本和分数，不重复存储订单快照或知识库正文。部署方应配置访问审计，并定期运行保留清理：
 
 ```bash
 docker compose run --rm migrate python scripts/prune_agent_runs.py --days 30

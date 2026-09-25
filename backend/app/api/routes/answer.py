@@ -17,7 +17,6 @@ from app.rag.answer_generator import AnswerGenerator
 from app.schemas.answer import AskRequest, AskResponse
 from app.services.answer import answer_question
 
-
 router = APIRouter(prefix="/knowledge-bases/{knowledge_base_id}", tags=["answers"])
 
 
@@ -32,6 +31,8 @@ async def ask(
     generator: Annotated[AnswerGenerator, Depends(get_answer_generator)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AskResponse:
+    # The authorization query must not hold a connection during model I/O.
+    await db.rollback()
     return await answer_question(
         db,
         embeddings,

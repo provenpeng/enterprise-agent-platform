@@ -21,7 +21,6 @@ from app.schemas.retrieval import SearchHit
 from app.services.errors import UpstreamUnavailable
 from app.services.retrieval import search_knowledge_base
 
-
 logger = logging.getLogger(__name__)
 ORDER_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 
@@ -111,7 +110,16 @@ async def diagnose_order(
                         citations=[],
                     )
                 }
-            trace.output = {"order": order.model_dump(mode="json")}
+            latest_attempt = (
+                order.refund_attempts[-1] if order.refund_attempts else None
+            )
+            trace.output = {
+                "order_id": order.order_id,
+                "refund_attempt_count": len(order.refund_attempts),
+                "latest_reason_code": latest_attempt.reason_code
+                if latest_attempt
+                else None,
+            }
             return {"order": order}
 
     async def retrieve(state: DiagnosticState) -> dict:
@@ -131,7 +139,17 @@ async def diagnose_order(
                 min_score=0.5,
                 timeout_seconds=embedding_timeout_seconds,
             )
-            trace.output = {"hits": [hit.model_dump(mode="json") for hit in hits]}
+            trace.output = {
+                "hits": [
+                    {
+                        "chunk_id": str(hit.chunk_id),
+                        "document_id": str(hit.document_id),
+                        "index_version": hit.index_version,
+                        "score": hit.score,
+                    }
+                    for hit in hits
+                ]
+            }
             return {"hits": hits}
 
     async def compose(state: DiagnosticState) -> dict:
@@ -189,7 +207,6 @@ async def diagnose_order(
                     )
             trace.output = {
                 "status": response.status,
-                "answer": response.answer,
                 "cited_chunk_ids": [
                     str(item.source.chunk_id) for item in response.citations
                 ],

@@ -4,6 +4,7 @@ import asyncio
 import uuid
 
 import pytest
+from conftest import make_token
 from langchain_core.embeddings import Embeddings
 
 from app.api.embedding_provider import get_query_embeddings
@@ -13,7 +14,6 @@ from app.models.document import Document, DocumentStatus
 from app.models.knowledge_base import KnowledgeBase
 from app.models.tenant import Tenant
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
-from conftest import make_token
 
 
 def vector(first: float, second: float = 0.0) -> list[float]:
@@ -191,3 +191,23 @@ async def test_search_rejects_provider_failures_and_invalid_requests(api_client)
 
     app.dependency_overrides.pop(get_query_embeddings)
     assert (await client.post(path, json={"query": "policy"})).status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_search_releases_authorization_connection_before_embedding(api_client):
+    client, engine, sessions, _ = api_client
+    knowledge_base_id, _, _ = await create_corpus(client, sessions)
+
+    class PoolCheckingEmbeddings(QueryEmbeddings):
+        async def aembed_query(self, text: str) -> list[float]:
+            assert engine.pool.checkedout() == 0
+            return await super().aembed_query(text)
+
+    embeddings = PoolCheckingEmbeddings()
+    app.dependency_overrides[get_query_embeddings] = lambda: embeddings
+    response = await client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/search",
+        json={"query": "refund policy"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["hits"]

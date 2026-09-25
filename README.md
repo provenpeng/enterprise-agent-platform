@@ -1,17 +1,36 @@
 # Enterprise Agent Platform
 
-面向企业知识检索与业务诊断的 AI Agent 平台。产品目标见 [产品规格](docs/PRODUCT_SPEC.md)。
+一个可运行、可审计的企业知识检索与订单诊断 Agent 示例。项目展示从文档上传、异步索引、租户隔离检索到带来源引用的回答，以及由 LangGraph 编排的受限业务工作流。业务数据和规则均为虚构示例。
 
-目前已提供知识库和文档 API、TXT/Markdown/PDF 解析、可切换的手动与 LangChain 分片、持久化索引任务、OpenAI Embedding、pgvector 存储、租户隔离检索、带来源引用的问答，以及基于 LangGraph 的模拟订单诊断工作流。
+## 能力一览
 
-## 环境要求
+| 能力 | 实现与边界 |
+| --- | --- |
+| 文档处理 | TXT、Markdown、文本型 PDF；手动实现与 LangChain 实现可按索引任务切换，输出相同的解析和分片契约 |
+| 持久化索引 | PostgreSQL 任务租约、失败重试、版本原子发布；pgvector 存储 1536 维 OpenAI Embedding |
+| 租户隔离 | RS256 JWT 中的 `tenant_id` 决定访问范围；知识库、检索、订单和运行轨迹均按租户查询 |
+| 检索与问答 | 仅检索已发布版本；服务端校验引用 ID 是否属于本次授权结果，证据不足时拒答 |
+| 订单诊断 | LangGraph 固定路由、只读订单工具、步骤轨迹、token 用量与固定合成数据评测 |
 
-- Python 3.12
-- Docker Engine 和 Docker Compose v2
+`manual` 与 `langchain` 文档处理器通过同一接口接入；LangChain 同时用于 Embedding、结构化模型调用，LangGraph 用于工作流。框架被放在适配层，任务、权限和索引版本规则保留在业务层。
+
+```mermaid
+flowchart LR
+    Client["API 客户端"] --> API["FastAPI / JWT"]
+    API --> PG[("PostgreSQL + pgvector")]
+    API --> Model["Embedding / Chat 模型"]
+    API --> Graph["LangGraph 诊断"]
+    Graph --> PG
+    Graph --> Model
+    API --> Uploads[("共享上传卷")]
+    Worker["索引 worker"] --> PG
+    Worker --> Uploads
+    Worker --> Model
+```
 
 ## 快速开始
 
-在仓库根目录复制配置并生成本地演示用的 RSA 密钥。私钥只留在本机，API 容器只挂载公钥。只体验非模型 API 时可以不填 `OPENAI_API_KEY`；要处理索引任务、检索或问答，需要填入可用的密钥：
+需要 Python 3.12、Docker Engine、Docker Compose v2 和 OpenSSL。以下命令在仓库根目录执行；`OPENAI_API_KEY` 在索引、检索、问答和诊断时需要。复制配置后，在本机编辑 `.env` 填入有效密钥；`.env` 和私钥已被 Git 忽略。
 
 ```bash
 cp .env.example .env
@@ -19,139 +38,71 @@ mkdir -p config
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out config/auth-private.pem
 openssl pkey -in config/auth-private.pem -pubout -out config/auth-public.pem
 docker compose up -d --build
-docker compose ps
+curl -fsS http://127.0.0.1:8000/api/v1/health
 ```
 
-Compose 会启动 PostgreSQL、一次性迁移任务和 API。配置密钥后，启动独立索引 worker：
+健康检查应返回 `{"status":"ok"}`。交互式 API 文档位于 [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)。Compose 启动 PostgreSQL、一次性迁移任务和 API；索引 worker 单独启动：
 
 ```bash
-docker compose --profile indexing up -d
+docker compose --profile indexing up -d indexer
 ```
 
-验证 API：
-
-```bash
-curl http://127.0.0.1:8000/api/v1/health
-```
-
-数据库连接正常时返回 `{"status":"ok"}`；数据库不可用时返回 HTTP 503。交互式 API 文档位于 `http://127.0.0.1:8000/docs`。
-
-本地开发也可以只用 Compose 启动 PostgreSQL，然后在 `backend/` 建立 Python 3.12 虚拟环境、运行 `pip install -e '.[test]'`、`alembic upgrade head`，分别启动 `uvicorn app.main:app --reload` 与 `python -m app.worker`。worker 需要 `OPENAI_API_KEY`。
-
-生成一小时有效的本地演示 Token。生产环境由身份服务签发 RS256 JWT，包含 `sub`、`tenant_id` 和 `role`。API 按租户隔离数据；`admin` 可维护租户、知识库和文档，`viewer` 可读取。同租户成员共享知识库。租户 ID 只能来自签名的 Token，不能由请求正文指定。
+建立演示租户、上传规则、等待索引并提问。以下变量由响应自动提取，无需手动替换 ID。演示 Token 有效期一小时，私钥只在本机使用；部署时应由身份服务签发 JWT。
 
 ```bash
 TENANT_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
-TOKEN=$(python3 backend/scripts/dev_token.py --subject demo-user --tenant-id "$TENANT_ID" --role admin)
-curl -X POST http://127.0.0.1:8000/api/v1/tenants \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
+TOKEN=$(python3 backend/scripts/dev_token.py --subject demo-user --tenant-id "$TENANT_ID")
+curl -fsS -X POST http://127.0.0.1:8000/api/v1/tenants \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"name":"Demo tenant"}'
-```
 
-已有知识库迁移时按原 `owner_sub` 分配独立租户。`legacy-unassigned` 迁移租户不可登录；需要管理员明确将这些知识库归入真实租户。迁移与安全边界见 [租户隔离设计](docs/TENANCY.md)。
-
-载入虚构订单并通过只读接口核对数据：
-
-```bash
-docker compose run --rm migrate python scripts/seed_demo_orders.py --tenant-id "$TENANT_ID"
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/business/orders/DEMO-WINDOW
-```
-
-四个固定案例和隔离边界见 [模拟业务工具](docs/DEMO_BUSINESS.md)。
-
-创建知识库并上传虚构的示例规则：
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases \
+KB_ID=$(curl -fsS -X POST http://127.0.0.1:8000/api/v1/knowledge-bases \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Refund policies"}' |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+DOC_ID=$(curl -fsS -X POST "http://127.0.0.1:8000/api/v1/knowledge-bases/$KB_ID/documents" \
   -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Policies","description":"Demo policies"}'
-curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/documents \
-  -H "Authorization: Bearer $TOKEN" \
-  -F 'file=@./examples/refund_policy.md;type=text/markdown'
+  -F 'file=@./examples/refund_policy.md;type=text/markdown' |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:8000/api/v1/documents/$DOC_ID/index-jobs"
 ```
 
-上传响应中的 `id` 是文档 ID。查看处理任务和活动分片，或请求重建索引：
+索引任务显示 `SUCCEEDED` 后运行：
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/chunks
-curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/v1/documents/REPLACE_WITH_DOCUMENT_ID/index-jobs
-```
-
-worker 完成索引后检索知识库：
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/search \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"退款需要谁批准？","top_k":5,"min_score":0.5}'
-```
-
-命中结果包含分数和文档、页码、章节等来源字段。接口与隔离、排序规则见 [检索设计](docs/RETRIEVAL.md)。
-
-基于已发布的分片回答并返回可核验的来源：
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/ask \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
+curl -fsS -X POST "http://127.0.0.1:8000/api/v1/knowledge-bases/$KB_ID/ask" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"query":"退款需要谁批准？"}'
-```
-
-响应包含 `answer`、`grounded` 和 `citations`；证据不足时明确拒答。引用校验和能力边界见 [问答设计](docs/CITED_QA.md)。
-
-诊断虚构订单并按需引用退款规则：
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/knowledge-bases/REPLACE_WITH_KB_ID/diagnose \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
+docker compose run --rm migrate python scripts/seed_demo_orders.py --tenant-id "$TENANT_ID"
+curl -fsS -X POST "http://127.0.0.1:8000/api/v1/knowledge-bases/$KB_ID/diagnose" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"question":"DEMO-WINDOW 为什么退款失败？","order_id":"DEMO-WINDOW"}'
 ```
 
-节点路由、拒答和超时边界见 [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)。
+诊断结果的 `run_id` 可供租户管理员查询 `/api/v1/agent-runs/{run_id}`。使用 `docker compose --profile indexing down` 停止服务；命名卷中的数据库和上传文件默认保留。
 
-诊断响应的 `run_id` 可供管理员查询完整步骤；固定数据集与真实 API 评测命令见 [运行轨迹与评测](docs/AGENT_TRACES_EVAL.md)。
+## 开发与质量检查
 
-上传支持 PDF、Markdown 和 TXT，默认上限为 10 MiB。同一知识库内上传相同内容会返回 HTTP 409。上传事务同时写入首个索引任务；worker 可离线恢复任务。原文件在本地开发时保存在 `data/uploads/`，在 Compose 中保存在共享命名卷。
-
-知识库和文档列表接口均支持 `limit`、`offset` 查询参数，默认返回 20 条，`limit` 最大为 100。数据库中的 `storage_uri` 保存相对于 `data/uploads/` 的文件 key，API 响应不公开服务器文件路径。
-
-停止容器可运行 `docker compose --profile indexing down`；默认保留数据库和上传文件的命名卷。
-
-## 配置
-
-根目录的 `.env.example` 是本地开发模板；复制后的 `.env` 已被 Git 忽略。Compose 从 `POSTGRES_*` 变量生成容器内部的数据库地址；本地 Python 进程从 `DATABASE_URL` 读取宿主机地址。修改数据库名称、用户、密码或宿主机端口时，需要同步更新本地 `DATABASE_URL`。示例密码仅供本地开发使用。
-
-### 文档处理实现切换
-
-`DOCUMENT_PROCESSING_BACKEND` 可设为 `manual`（默认）或 `langchain`。两种实现通过同一个 `DocumentProcessor` 接口输出 `ParsedDocument` 和 `ChunkCandidate`。TXT/Markdown 处理器接收文本字符串，PDF 处理器接收原始文件字节。新任务会记录创建时选择的实现，已有任务不会因配置变化而改变。
-
-- `manual` 使用项目内的 TXT/Markdown 解析器及结构感知分片器。
-- `langchain` 使用 LangChain 的 Markdown 标题分割器和递归文本分割器；TXT 无标题结构，以 LangChain `Document` 交给递归分割器。
-- PDF 在两种模式下均由 pypdf 提取页面文本，再使用所选模式的文本解析与分片实现。分片保留页码；扫描件没有可提取文本时会明确报错，目前不提供 OCR。
-
-切换实现后重启 API，再通过重建接口创建新索引任务。两种实现保持相同输出类型与来源字段，分片边界可以不同。索引任务的租约、重试与版本发布规则见 [索引设计](docs/INDEXING.md)。
-
-## 测试
-
-在 `backend/` 目录中激活虚拟环境后运行：
+本地安装：在 `backend/` 使用 Python 3.12 创建虚拟环境并运行 `pip install -e '.[test]'`。复制 `.env.example` 后，`DATABASE_URL` 指向宿主机 PostgreSQL；测试用户需要创建数据库和 `vector` 扩展的权限。
 
 ```bash
-pip install -e '.[test]'
-pytest
+cd backend
+ruff check app tests scripts alembic
+ruff format --check app tests scripts alembic
+alembic upgrade head
+alembic check
+pytest -q
 ```
 
-测试覆盖健康接口、上传事务、PDF 页码、索引重建、失败重试、过期 worker 的发布保护、租户隔离检索、带引用问答、诊断工作流路由、运行轨迹和固定评测评分。数据库集成测试使用临时 PostgreSQL 数据库；测试用户需要有创建数据库和 `vector` 扩展的权限。GitHub Actions 在 pgvector PostgreSQL 上执行迁移与完整测试。
+CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像。测试使用确定性的假模型；真实模型质量可按 [运行轨迹与评测](docs/AGENT_TRACES_EVAL.md) 中的命令评估，固定数据集不能代表真实业务质量。
 
-## 当前数据模型
+## 设计与限制
 
-`Tenant` 包含多个 `KnowledgeBase`，每个知识库包含多个 `Document`；每个文档包含索引任务和按 `index_version` 区分的 `Chunk`。`Chunk.embedding` 为 1536 维向量，使用 HNSW 余弦索引。删除知识库或文档时，数据库外键级联删除下级记录。
+- [产品范围](docs/PRODUCT_SPEC.md) · [租户隔离](docs/TENANCY.md) · [索引状态机](docs/INDEXING.md) · [检索](docs/RETRIEVAL.md) · [带引用问答](docs/CITED_QA.md) · [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)
+- PDF 只提取文本，不含 OCR。默认上传上限为 10 MiB；上传文件保存在共享卷。生产部署还应在入口网关限制请求体大小。
+- 引用校验确认来源属于本次授权检索结果，不能证明回答的每一句话在语义上成立。高风险结论仍需人工审核。
+- 运行轨迹包含原问题与最终回答；应限制管理员访问并按 [保留说明](docs/AGENT_TRACES_EVAL.md) 定期清理。
+- 本仓库是架构与工程实践示例。当前未实现线上身份服务、分布式限流、OCR 或真实业务系统连接器。
 
-`Document.status` 表示最近一次处理尝试的状态。重建失败时，`status` 可以是 `FAILED`，而 `active_index_version` 仍指向可用的旧版本。新版本的分片、向量和活动版本指针在同一事务内发布。
-
-## 许可证
-
-见 [LICENSE](LICENSE)。
+欢迎通过 Issue 描述可复现问题，或按 [贡献指南](CONTRIBUTING.md) 提交改进。许可证：[MIT](LICENSE)。

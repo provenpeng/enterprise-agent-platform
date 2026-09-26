@@ -56,5 +56,37 @@ jobs:
         run: ruff check app tests scripts alembic
       - name: Check Python formatting
         run: ruff format --check app tests scripts alembic
+      - name: Check committed OpenAPI contract
+        run: |
+          python scripts/export_openapi.py ../frontend/openapi.json
+          git diff --exit-code -- ../frontend/openapi.json
       - name: Run tests
         run: pytest -q
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Check generated API types
+        run: |
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.ts
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm run test
+      - name: Build
+        run: npm run build

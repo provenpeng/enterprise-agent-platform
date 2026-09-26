@@ -212,6 +212,13 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Frontend build and local tool state
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/playwright-report/
+frontend/test-results/
+
 # PyPI configuration file
 .pypirc
 

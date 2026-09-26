@@ -1,4 +1,4 @@
-"""Exact tenant-scoped vector retrieval over published document versions."""
+"""Tenant-scoped vector retrieval with bounded lexical reranking."""
 
 import asyncio
 import logging
@@ -12,6 +12,7 @@ from app.models.chunk import Chunk
 from app.models.document import Document
 from app.models.knowledge_base import KnowledgeBase
 from app.rag.embeddings import validate_embedding
+from app.rag.rerank import rerank_hits
 from app.schemas.retrieval import SearchHit
 from app.services.errors import UpstreamUnavailable
 
@@ -44,8 +45,8 @@ async def search_knowledge_base(
         raise UpstreamUnavailable("Query embedding is unavailable") from exc
 
     # Materialization filters by tenant, knowledge base and active version before
-    # computing distance. This avoids post-filtered ANN underfill and guarantees
-    # exact top-k ordering within the authorized corpus.
+    # computing distance. This avoids post-filtered ANN underfill. Lexical
+    # reranking sees only a bounded, already authorized vector candidate pool.
     candidates = (
         select(
             Chunk.id.label("chunk_id"),
@@ -82,11 +83,12 @@ async def search_knowledge_base(
         "MATERIALIZED", dialect="postgresql"
     )
     distance = candidates.c.embedding.cosine_distance(vector)
+    candidate_limit = top_k if required_term else max(50, top_k * 5)
     rows = await db.execute(
         select(candidates, distance.label("distance"))
         .where(distance <= 1.0 - min_score)
         .order_by(distance, candidates.c.chunk_id)
-        .limit(top_k)
+        .limit(candidate_limit)
     )
     hits = [
         SearchHit(
@@ -103,6 +105,8 @@ async def search_knowledge_base(
         )
         for row in rows
     ]
+    if not required_term:
+        hits = rerank_hits(query, hits)[:top_k]
     logger.info(
         "Retrieved %s chunks from knowledge base %s", len(hits), knowledge_base_id
     )

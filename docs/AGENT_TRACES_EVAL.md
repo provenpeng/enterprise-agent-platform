@@ -102,3 +102,31 @@ CI 用假模型和 HTTP 模拟结果验证基准评分、语料契约及失败�
 ### 多来源问答的引用编号
 
 7B 在 `qa_compare_deadlines` 已找到两个正确章节，原始草稿也给出正确事实，但把第一个 36 字符 chunk UUID 的一个字符抄错；服务端因此拒绝整个回答。改为请求内短证据编号并由服务端映射回 UUID 后，相同知识库和模型的完整基准中问答来源从 **5/6 提升到 6/6**，无答案拒答保持 **2/2**，诊断来源保持 **4/4**。付费 `deepseek-chat` 对照仍为问答 **6/6**、拒答 **2/2**、诊断 **4/4**。未知编号仍让整条草稿拒答，不会猜测最相近的 UUID。此结果尚需用未参与调参的案例验证。
+
+## 冻结的留出集与质量门槛
+
+[`benchmark_holdout_v1.json`](../backend/evals/benchmark_holdout_v1.json)复用原有三份文档及章节标签，但使用未参与上述改动调试的 9 条检索、8 条问答、4 条诊断和 3 条跨租户问题。案例和[`holdout_quality_gate_v1.json`](../backend/evals/holdout_quality_gate_v1.json)中的逐指标非零门槛先提交，再运行模型；报告中的 profile SHA-256 可校验门槛版本。可复用已索引的同一知识库，仍必须通过语料、索引版本和向量空间预检：
+
+```bash
+backend/.venv/bin/python backend/scripts/evaluate_benchmark.py \
+  --dataset backend/evals/benchmark_holdout_v1.json run \
+  --knowledge-base-id "$KB_ID" \
+  --output backend/evals/reports/holdout.json \
+  --quality-profile backend/evals/holdout_quality_gate_v1.json
+```
+
+`--quality-profile` 与统一的 `--min-score` 互斥。留出集门槛要求检索 Recall@1 ≥ 0.70、Recall@5 ≥ 0.90、MRR@5 ≥ 0.75，问答正确来源 ≥ 0.90；无命中、拒答、诊断和租户隔离要求全部正确。低于任一门槛时仍写出逐例报告，并以退出码 1 失败。配置版本不匹配或缺少指标时拒绝评分。
+
+在相同本地 `nomic-embed-text` 索引上首次运行留出集，结果如下；**两个模型均未通过质量门槛**，门槛和案例没有因结果调整：
+
+| 指标 | 本地 7B | `deepseek-chat` | 门槛 |
+| --- | ---: | ---: | ---: |
+| 检索 Recall@1 | 4/7 | 4/7 | ≥ 0.70 |
+| 检索 Recall@5 | 6/7 | 6/7 | ≥ 0.90 |
+| 检索 MRR@5 | 0.69 | 0.69 | ≥ 0.75 |
+| 问答正确来源 | 5/6 | 4/6 | ≥ 0.90 |
+| 无答案拒答 | 2/2 | 2/2 | 1.00 |
+| 诊断状态、来源 | 4/4 | 4/4 | 1.00 |
+| 跨租户隔离 | 3/3 | 3/3 | 1.00 |
+
+两次检索都未将可退余额章节放入 Top 5；两个模型都只引用了一侧证据来回答退款与退货期限的双来源问题。DeepSeek 在余额问答额外引用了不要求的章节。逐例 JSON 保存在本地被 Git 忽略的报告目录。留出集仍是小规模合成数据，同一语料也限制了它对真实业务的外推；来源匹配不检查每句事实是否被证据支持。下一轮检索和证据选择改动应使用**新开发集**，保留这份留出集用于最终回归检查，并引入人工事实支持评审。

@@ -15,6 +15,7 @@ from app.evaluation.benchmark import (
     assess_quality_gate,
     compare_baseline,
     load_benchmark,
+    load_quality_profile,
 )
 from app.evaluation.runner import inspect_corpus, prepare_corpus, run_benchmark
 
@@ -30,6 +31,11 @@ async def execute(arguments: argparse.Namespace) -> int:
         raise ValueError("Set EAP_EVAL_OUTSIDER_TOKEN to another tenant's token")
     settings = get_settings()
     dataset, dataset_sha256 = load_benchmark(arguments.dataset)
+    profile = (
+        load_quality_profile(arguments.quality_profile, dataset.version)
+        if arguments.action == "run" and arguments.quality_profile
+        else None
+    )
     async with httpx.AsyncClient(
         base_url=arguments.base_url.rstrip("/"),
         headers={"Authorization": f"Bearer {token}"},
@@ -77,8 +83,19 @@ async def execute(arguments: argparse.Namespace) -> int:
         else []
     )
     report["quality_gate"] = assess_quality_gate(
-        report["metrics"], min_score=arguments.min_score, regressions=regressions
+        report["metrics"],
+        min_score=0
+        if profile
+        else (arguments.min_score if arguments.min_score is not None else 0.75),
+        regressions=regressions,
+        thresholds=profile[0].thresholds if profile else None,
     )
+    if profile:
+        report["quality_gate"]["profile"] = {
+            "name": profile[0].name,
+            "dataset_version": profile[0].dataset_version,
+            "sha256": profile[1],
+        }
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w",
@@ -119,14 +136,20 @@ def main() -> None:
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--baseline", type=Path)
     run.add_argument("--max-regression", type=float, default=0.05)
-    run.add_argument("--min-score", type=float, default=0.75)
+    threshold = run.add_mutually_exclusive_group()
+    threshold.add_argument("--min-score", type=float)
+    threshold.add_argument("--quality-profile", type=Path)
     arguments = parser.parse_args()
     if arguments.action == "prepare" and arguments.timeout <= 0:
         parser.error("--timeout must be positive")
-    if arguments.action == "run" and not (
-        0 <= arguments.max_regression <= 1 and 0 <= arguments.min_score <= 1
+    if arguments.action == "run" and not 0 <= arguments.max_regression <= 1:
+        parser.error("--max-regression must be between 0 and 1")
+    if (
+        arguments.action == "run"
+        and arguments.min_score is not None
+        and not 0 <= arguments.min_score <= 1
     ):
-        parser.error("--max-regression and --min-score must be between 0 and 1")
+        parser.error("--min-score must be between 0 and 1")
     try:
         raise SystemExit(asyncio.run(execute(arguments)))
     except (

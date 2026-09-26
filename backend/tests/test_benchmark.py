@@ -17,6 +17,7 @@ from app.evaluation.benchmark import (
     compare_baseline,
     corpus_files,
     load_benchmark,
+    load_quality_profile,
     relevant_rank,
 )
 from app.evaluation.runner import inspect_corpus, prepare_corpus, run_benchmark
@@ -25,6 +26,8 @@ from app.rag.processing import create_document_processor
 from app.services.indexer import process_one_index_job
 
 DATASET = Path(__file__).resolve().parents[1] / "evals" / "benchmark_v1.json"
+HOLDOUT = DATASET.with_name("benchmark_holdout_v1.json")
+HOLDOUT_GATE = DATASET.with_name("holdout_quality_gate_v1.json")
 SPACE_ID = "a" * 64
 
 
@@ -49,6 +52,41 @@ def test_benchmark_manifest_is_versioned_and_source_labeled() -> None:
         "DEMO-GATEWAY",
         "DEMO-SUCCESS",
     }
+
+
+def test_holdout_reuses_frozen_corpus_with_unseen_cases_and_explicit_gate(
+    tmp_path: Path,
+) -> None:
+    training, _ = load_benchmark(DATASET)
+    holdout, _ = load_benchmark(HOLDOUT)
+    assert holdout.version != training.version
+    assert holdout.corpus == training.corpus
+    assert holdout.sources == training.sources
+    for category in ("retrieval", "qa", "diagnostic", "authorization"):
+        known = {case.id for case in getattr(training, category)}
+        new = {case.id for case in getattr(holdout, category)}
+        assert known.isdisjoint(new)
+    profile, digest = load_quality_profile(HOLDOUT_GATE, holdout.version)
+    assert len(digest) == 64
+    assert all(value > 0 for value in profile.thresholds.values())
+    with pytest.raises(ValueError, match="different dataset"):
+        load_quality_profile(HOLDOUT_GATE, training.version)
+    scores = dict.fromkeys(profile.thresholds, 1.0)
+    assert assess_quality_gate(
+        scores, min_score=0, regressions=[], thresholds=profile.thresholds
+    )["passed"]
+    scores["qa_citation_source_accuracy"] = 0.8
+    gate = assess_quality_gate(
+        scores, min_score=0, regressions=[], thresholds=profile.thresholds
+    )
+    assert gate["below_threshold"] == ["qa_citation_source_accuracy"]
+    assert not gate["passed"]
+    invalid = json.loads(HOLDOUT_GATE.read_text(encoding="utf-8"))
+    invalid["thresholds"]["qa_citation_source_accuracy"] = 0
+    path = tmp_path / "invalid-gate.json"
+    path.write_text(json.dumps(invalid), encoding="utf-8")
+    with pytest.raises(ValueError, match="nonzero threshold"):
+        load_quality_profile(path, holdout.version)
 
 
 @pytest.mark.parametrize("backend", ["manual", "langchain"])

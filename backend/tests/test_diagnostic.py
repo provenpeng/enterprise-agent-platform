@@ -131,8 +131,10 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     assert body["order"]["order_id"] == "DEMO-WINDOW"
     assert body["order"]["refund_attempts"][0]["reason_code"] == "REFUND_WINDOW_EXPIRED"
     assert body["answer"].endswith("来源：[1]")
+    assert "支付后 30 天内可申请退款" in body["answer"]
+    assert "支付时间" not in body["answer"]
     assert body["citations"][0]["source"]["chunk_id"] == str(chunk_id)
-    assert (model.plan_calls, model.explain_calls, embeddings.calls) == (1, 1, 1)
+    assert (model.plan_calls, model.explain_calls, embeddings.calls) == (1, 0, 1)
     assert body["run_id"]
     admin_run = await client.get(f"/api/v1/agent-runs/{body['run_id']}")
     assert admin_run.status_code == 200
@@ -141,9 +143,9 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     assert trace["outcome"] == "ANSWERED"
     assert trace["model_name"] == "gpt-4o-mini"
     assert (trace["input_tokens"], trace["output_tokens"], trace["total_tokens"]) == (
-        36,
         12,
-        48,
+        4,
+        16,
     )
     assert [step["name"] for step in trace["steps"]] == [
         "plan",
@@ -155,7 +157,8 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     assert trace["steps"][2]["output_data"]["hits"][0]["chunk_id"] == str(chunk_id)
     assert "content" not in trace["steps"][2]["output_data"]["hits"][0]
     assert "answer" not in trace["steps"][3]["output_data"]
-    assert trace["steps"][3]["total_tokens"] == 32
+    assert trace["steps"][3]["total_tokens"] is None
+    assert trace["steps"][3]["output_data"]["composition"] == "reason_code_evidence"
     assert (
         await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=viewer)
     ).status_code == 403
@@ -179,12 +182,14 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     )
     assert explicit.json()["order"]["order_id"] == "DEMO-WINDOW"
 
-    model.order_id = "DEMO-WINDOW"
+    model.order_id = "DEMO-SUCCESS"
     model.citation_override = str(uuid.uuid4())
-    invalid = await client.post(path, json={"question": "DEMO-WINDOW 为什么退款失败？"})
+    invalid = await client.post(
+        path, json={"question": "DEMO-SUCCESS 的退款规则是什么？"}
+    )
     assert invalid.json()["status"] == "BUSINESS_FACTS_ONLY"
     assert invalid.json()["citations"] == []
-    assert "REFUND_WINDOW_EXPIRED" in invalid.json()["answer"]
+    assert "SUCCEEDED" in invalid.json()["answer"]
 
 
 @pytest.mark.asyncio
@@ -231,7 +236,7 @@ async def test_diagnostic_short_circuits_missing_order_and_status_only(api_clien
     assert exact_policy.json()["status"] == "ANSWERED"
     assert len(exact_policy.json()["citations"]) == 1
     assert embeddings.calls == 1
-    assert model.explain_calls == 1
+    assert model.explain_calls == 0
 
 
 @pytest.mark.asyncio

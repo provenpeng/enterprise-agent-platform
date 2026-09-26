@@ -1,6 +1,7 @@
 """Synthetic business tool verifies tenant scope and repeatable fixtures."""
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from conftest import make_token
@@ -31,6 +32,18 @@ async def test_seed_and_read_only_tool_are_tenant_scoped(api_client):
         assert own is not None
         assert own.refund_attempts[0].status == RefundStatus.FAILED
         assert own.refund_attempts[0].reason_code == "REFUND_WINDOW_EXPIRED"
+        assert own.refund_attempts[0].created_at - own.created_at == timedelta(days=32)
+        stale_attempt = await db.scalar(
+            select(DemoRefundAttempt).where(
+                DemoRefundAttempt.tenant_id == first_tenant,
+                DemoRefundAttempt.order_id == "DEMO-WINDOW",
+            )
+        )
+        stale_attempt.created_at = own.created_at
+        await db.commit()
+        assert await seed_demo_orders(db, first_tenant) == 0
+        await db.refresh(stale_attempt)
+        assert stale_attempt.created_at - own.created_at == timedelta(days=32)
         assert await OrderLookupTool(db, first_tenant).lookup("MISSING") is None
 
     viewer = {"Authorization": f"Bearer {make_token('test-user', role='viewer')}"}

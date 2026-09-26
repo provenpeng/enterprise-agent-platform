@@ -7,6 +7,7 @@ from app.api.routes import (
     diagnostic,
     documents,
     health,
+    identity,
     knowledge_bases,
     retrieval,
     tenants,
@@ -14,6 +15,7 @@ from app.api.routes import (
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
+api_router.include_router(identity.router)
 api_router.include_router(tenants.router)
 api_router.include_router(knowledge_bases.router)
 api_router.include_router(retrieval.router)

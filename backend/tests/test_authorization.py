@@ -147,6 +147,13 @@ async def test_tenant_members_share_reads_and_viewer_cannot_write(api_client) ->
     viewer = {
         "Authorization": f"Bearer {make_token('colleague', tenant_id=str(tenant_id), role='viewer')}"
     }
+    identity = await client.get("/api/v1/me", headers=viewer)
+    assert identity.status_code == 200
+    assert identity.json() == {
+        "subject": "colleague",
+        "tenant_id": str(tenant_id),
+        "role": "viewer",
+    }
     assert (
         await client.get(f"/api/v1/knowledge-bases/{knowledge_base_id}", headers=viewer)
     ).status_code == 200

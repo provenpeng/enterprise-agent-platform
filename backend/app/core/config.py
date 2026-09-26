@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     embedding_api_key: SecretStr | None = None
     embedding_api_base_url: AnyHttpUrl | None = None
+    embedding_provider_id: str | None = Field(
+        default=None, min_length=1, max_length=100
+    )
     embedding_native_dimensions: int = Field(default=1536, ge=1, le=1536)
     embedding_revision: str = Field(default="default", min_length=1, max_length=100)
     chat_api_key: SecretStr | None = None
@@ -66,12 +69,20 @@ class Settings(BaseSettings):
             else None,
             native_dimensions=self.embedding_native_dimensions,
             revision=self.embedding_revision,
+            provider_id=self.embedding_provider_id,
         )
 
     @field_validator("chat_api_base_url", "embedding_api_base_url", mode="before")
     @classmethod
     def empty_chat_base_url_is_unset(cls, value: str | None) -> str | None:
         return value or None
+
+    @field_validator("embedding_provider_id", mode="before")
+    @classmethod
+    def normalize_embedding_provider_id(cls, value: str | None) -> str | None:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
 
     @model_validator(mode="after")
     def validate_index_token_limits(self) -> "Settings":

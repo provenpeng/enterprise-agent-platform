@@ -71,6 +71,7 @@ async def execute(arguments: argparse.Namespace) -> int:
                     "embedding_model": settings.embedding_model,
                     "embedding_native_dimensions": settings.embedding_native_dimensions,
                     "embedding_revision": settings.embedding_revision,
+                    "embedding_provider_id": settings.embedding_provider_id,
                     "embedding_space_id": settings.embedding_space_id,
                     "answer_model": settings.answer_model,
                     "chat_structured_output_method": settings.chat_structured_output_method,

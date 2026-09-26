@@ -26,6 +26,7 @@ async def test_live_model_rag_and_diagnosis(api_client) -> None:
         "embedding_model",
         "embedding_native_dimensions",
         "embedding_revision",
+        "embedding_provider_id",
         "embedding_api_key",
         "embedding_api_base_url",
         "chat_api_key",

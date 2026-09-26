@@ -155,6 +155,7 @@ activemq-data/
 config/*.pem
 data/
 .envrc
+backend/evals/reports/
 .venv
 env/
 venv/

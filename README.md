@@ -95,7 +95,7 @@ alembic check
 pytest -q
 ```
 
-CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像。测试使用确定性的假模型；真实模型质量可按 [运行轨迹与评测](docs/AGENT_TRACES_EVAL.md) 中的命令评估，固定数据集不能代表真实业务质量。
+CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像。测试使用确定性的假模型；[版本化 RAG 与 Agent 基准](docs/AGENT_TRACES_EVAL.md)可在显式启动模型后生成可比较的检索、引用、拒答和跨租户报告。合成数据集不能代表真实业务质量。
 
 ## 设计与限制
 

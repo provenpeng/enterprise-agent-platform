@@ -44,6 +44,21 @@ button, input, textarea { font: inherit; }
 .answer-result { border-top: 1px solid #edf0f0; margin-top: 22px; padding-top: 20px; }
 .answer-text { white-space: pre-wrap; line-height: 1.8; margin: 15px 0 0; }
 .answer-empty { margin: 35px 0 10px; }
+.conversation-layout { display: grid; grid-template-columns: minmax(180px, 230px) minmax(0, 1fr); gap: 24px; }
+.conversation-sidebar { border-right: 1px solid #e3eaea; padding-right: 16px; min-width: 0; }
+.conversation-list { display: grid; gap: 6px; margin-top: 14px; }
+.conversation-list-row { display: flex; align-items: center; gap: 2px; }
+.conversation-item { min-width: 0; flex: 1; display: grid; gap: 3px; border: 1px solid transparent; border-radius: 8px; padding: 9px; color: #18323a; background: transparent; text-align: left; cursor: pointer; }
+.conversation-item:hover, .conversation-item:focus-visible, .conversation-item.selected { background: #e6f3f1; border-color: #b9dbd8; }
+.conversation-item:disabled { cursor: default; }
+.conversation-item strong, .conversation-item small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-item small { color: #72848a; font-size: 11px; }
+.conversation-main { min-width: 0; }
+.conversation-turn { padding: 18px 0; border-bottom: 1px solid #edf0f0; }
+.conversation-turn:first-child { padding-top: 0; }
+.conversation-turn .sources { margin-top: 12px; }
+.conversation-form { margin-top: 24px; }
+.conversation-note { display: block; margin-top: 16px; font-size: 12px; }
 .sources { margin-top: 26px; }
 .source-card { margin-top: 10px; background: #f9fbfb; }
 .source-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
@@ -74,4 +89,6 @@ button, input, textarea { font: inherit; }
   .app-content { padding: 24px 14px 44px; }
   .workspace-grid { grid-template-columns: 1fr; }
   .kb-card .ant-card-body { max-height: 360px; overflow: auto; }
+  .conversation-layout { grid-template-columns: 1fr; }
+  .conversation-sidebar { border-right: 0; border-bottom: 1px solid #e3eaea; padding: 0 0 16px; }
 }

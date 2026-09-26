@@ -21,6 +21,7 @@ from app.models.knowledge_base import KnowledgeBase
 from app.rag.answer_generator import AnswerGenerator
 from app.schemas.answer import AskRequest, AskResponse
 from app.services.answer import answer_question, retrieve_answer_hits, stream_answer
+from app.services.conversations import append_verified_turn, validate_conversation
 from app.services.errors import UpstreamUnavailable
 
 router = APIRouter(prefix="/knowledge-bases/{knowledge_base_id}", tags=["answers"])
@@ -39,7 +40,14 @@ async def ask(
     generator: Annotated[AnswerGenerator, Depends(get_answer_generator)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AskResponse:
-    return await answer_question(
+    await validate_conversation(
+        db,
+        tenant_id=principal.tenant_id,
+        owner_sub=principal.subject,
+        knowledge_base_id=knowledge_base_id,
+        conversation_id=payload.conversation_id,
+    )
+    answer = await answer_question(
         db,
         embeddings,
         generator,
@@ -51,6 +59,15 @@ async def ask(
         min_score=payload.min_score,
         embedding_timeout_seconds=settings.retrieval_embedding_timeout_seconds,
         generation_timeout_seconds=settings.answer_generation_timeout_seconds,
+    )
+    return await append_verified_turn(
+        db,
+        tenant_id=principal.tenant_id,
+        owner_sub=principal.subject,
+        knowledge_base_id=knowledge_base_id,
+        conversation_id=payload.conversation_id,
+        question=payload.query,
+        answer=answer,
     )
 
 
@@ -78,6 +95,13 @@ async def ask_stream(
     # Authorization and retrieval finish before response headers are sent, so
     # their failures retain normal HTTP status codes. The database transaction
     # is released before any model stream is consumed.
+    await validate_conversation(
+        db,
+        tenant_id=principal.tenant_id,
+        owner_sub=principal.subject,
+        knowledge_base_id=knowledge_base_id,
+        conversation_id=payload.conversation_id,
+    )
     hits = await retrieve_answer_hits(
         db,
         embeddings,
@@ -103,7 +127,16 @@ async def ask_stream(
                 if isinstance(update, str):
                     yield _sse("delta", {"text": update, "provisional": True})
                 else:
-                    yield _sse("final", update.model_dump(mode="json"))
+                    final = await append_verified_turn(
+                        db,
+                        tenant_id=principal.tenant_id,
+                        owner_sub=principal.subject,
+                        knowledge_base_id=knowledge_base_id,
+                        conversation_id=payload.conversation_id,
+                        question=payload.query,
+                        answer=update,
+                    )
+                    yield _sse("final", final.model_dump(mode="json"))
         except Exception as exc:
             if not isinstance(exc, UpstreamUnavailable):
                 logger.exception(

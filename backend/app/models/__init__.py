@@ -1,5 +1,6 @@
 from app.models.agent_run import AgentRun, AgentRunStatus, AgentRunStep
 from app.models.chunk import Chunk
+from app.models.conversation import Conversation, ConversationTurn
 from app.models.demo_order import (
     DemoOrder,
     DemoRefundAttempt,
@@ -13,6 +14,8 @@ from app.models.tenant import Tenant
 
 __all__ = [
     "Chunk",
+    "Conversation",
+    "ConversationTurn",
     "AgentRun",
     "AgentRunStatus",
     "AgentRunStep",

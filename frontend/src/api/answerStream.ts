@@ -22,6 +22,7 @@ function isAnswer(value: unknown): value is Answer {
   if (!value || typeof value !== "object") return false;
   const answer = value as Record<string, unknown>;
   return typeof answer.knowledge_base_id === "string"
+    && typeof answer.conversation_id === "string"
     && typeof answer.answer === "string"
     && typeof answer.grounded === "boolean"
     && Array.isArray(answer.citations)
@@ -46,13 +47,14 @@ export async function streamAnswer(
   query: string,
   onDelta: (text: string) => void,
   signal: AbortSignal,
+  conversationId: string | null = null,
 ): Promise<Answer> {
   const response = await fetch(
     `/api/v1/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/ask/stream`,
     {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, conversation_id: conversationId }),
       signal,
     },
   );

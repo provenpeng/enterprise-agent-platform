@@ -164,9 +164,13 @@ function Console({ token, name, signOut }: { token: string; name: string; signOu
   );
 }
 
+function AuthenticatedWorkspace({ token, name, signOut }: { token: string; name: string; signOut: () => Promise<void> }) {
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5000, retry: 1 } } }));
+  return <QueryClientProvider client={queryClient}><Console token={token} name={name} signOut={signOut} /></QueryClientProvider>;
+}
+
 export function Workspace() {
   const { state, signOut } = useAuth();
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 5000, retry: 1 } } }));
   if (state.status !== "signed_in") return null;
-  return <QueryClientProvider client={queryClient}><Console token={state.token} name={state.name} signOut={signOut} /></QueryClientProvider>;
+  return <AuthenticatedWorkspace key={state.token} token={state.token} name={state.name} signOut={signOut} />;
 }

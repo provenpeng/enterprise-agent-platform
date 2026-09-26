@@ -12,6 +12,7 @@
 | 检索与问答 | 仅检索已发布版本及当前 Embedding 向量空间；服务端校验引用 ID 是否属于本次授权结果，证据不足时拒答 |
 | 订单诊断 | LangGraph 固定路由、只读订单工具、步骤轨迹、token 用量与固定合成数据评测 |
 | 请求可观测性 | 响应关联 ID、脱敏结构化访问日志；诊断运行另有持久化步骤轨迹 |
+| 运行保护 | 模型请求并发容量门、快速可重试的 503、模型阶段超时 |
 
 `manual` 与 `langchain` 文档处理器通过同一接口接入；LangChain 同时用于 Embedding、结构化模型调用，LangGraph 用于工作流。框架被放在适配层，任务、权限和索引版本规则保留在业务层。
 
@@ -102,6 +103,7 @@ CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查�
 
 - [代码边界与扩展点](docs/ARCHITECTURE.md) · [产品范围](docs/PRODUCT_SPEC.md) · [模型接入](docs/MODEL_PROVIDERS.md) · [租户隔离](docs/TENANCY.md) · [索引状态机](docs/INDEXING.md) · [检索](docs/RETRIEVAL.md) · [带引用问答](docs/CITED_QA.md) · [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)
 - [请求级可观测性](docs/OBSERVABILITY.md) · [运行轨迹与评测](docs/AGENT_TRACES_EVAL.md)
+- [模型请求运行保护](docs/RUNTIME_PROTECTION.md)
 - PDF 只提取文本，不含 OCR。默认上传上限为 10 MiB；上传文件保存在共享卷。生产部署还应在入口网关限制请求体大小。
 - 引用校验确认来源属于本次授权检索结果，不能证明回答的每一句话在语义上成立。高风险结论仍需人工审核。
 - 运行轨迹包含原问题与最终回答；应限制管理员访问并按 [保留说明](docs/AGENT_TRACES_EVAL.md) 定期清理。

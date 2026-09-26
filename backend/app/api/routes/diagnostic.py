@@ -13,6 +13,7 @@ from app.agent.workflow import DiagnosticOptions, DiagnosticWorkflow
 from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
+from app.api.model_admission import model_request_slot
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
@@ -28,6 +29,7 @@ async def diagnose(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
     _knowledge_base: Annotated[KnowledgeBase, Depends(authorized_knowledge_base)],
+    _model_slot: Annotated[None, Depends(model_request_slot)],
     embeddings: Annotated[Embeddings, Depends(get_query_embeddings)],
     model: Annotated[DiagnosticModel, Depends(get_diagnostic_model)],
     settings: Annotated[Settings, Depends(get_settings)],

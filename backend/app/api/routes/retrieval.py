@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.embedding_provider import get_query_embeddings
+from app.api.model_admission import model_request_slot
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
@@ -25,12 +26,10 @@ async def search(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
     _knowledge_base: Annotated[KnowledgeBase, Depends(authorized_knowledge_base)],
+    _model_slot: Annotated[None, Depends(model_request_slot)],
     embeddings: Annotated[Embeddings, Depends(get_query_embeddings)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> SearchResponse:
-    # Authorization has completed; release its read transaction before the
-    # network-bound embedding call. Retrieval opens a fresh scoped transaction.
-    await db.rollback()
     hits = await search_knowledge_base(
         db,
         embeddings,

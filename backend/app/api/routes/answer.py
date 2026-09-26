@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.answer_provider import get_answer_generator
 from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.embedding_provider import get_query_embeddings
+from app.api.model_admission import model_request_slot
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
@@ -27,12 +28,11 @@ async def ask(
     db: Annotated[AsyncSession, Depends(get_db)],
     principal: Annotated[Principal, Depends(get_principal)],
     _knowledge_base: Annotated[KnowledgeBase, Depends(authorized_knowledge_base)],
+    _model_slot: Annotated[None, Depends(model_request_slot)],
     embeddings: Annotated[Embeddings, Depends(get_query_embeddings)],
     generator: Annotated[AnswerGenerator, Depends(get_answer_generator)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AskResponse:
-    # The authorization query must not hold a connection during model I/O.
-    await db.rollback()
     return await answer_question(
         db,
         embeddings,

@@ -13,7 +13,7 @@
 | 订单诊断 | LangGraph 固定路由、只读订单工具、步骤轨迹、token 用量与固定合成数据评测 |
 | 请求可观测性 | 响应关联 ID、脱敏结构化访问日志；诊断运行另有持久化步骤轨迹 |
 | 运行保护 | 模型请求并发容量门、快速可重试的 503、模型阶段超时 |
-| Web 工作台 | React、TypeScript、Vite、Ant Design；租户初始化、知识库与文档管理、索引状态、流式问答和来源卡片 |
+| Web 工作台 | React、TypeScript、Vite、Ant Design；租户初始化、知识库与文档管理、索引状态、流式问答、订单诊断和管理员运行轨迹 |
 
 `manual` 与 `langchain` 文档处理器通过同一接口接入；LangChain 同时用于 Embedding、结构化模型调用，LangGraph 用于工作流。框架被放在适配层，任务、权限和索引版本规则保留在业务层。
 
@@ -101,6 +101,8 @@ npm run dev
 ```
 
 打开 Vite 输出的本机地址。开发服务器将 `/api` 代理至 `http://127.0.0.1:8000`。如需使用本机演示 JWT，把 `frontend/.env.local` 中的 `VITE_DEV_TOKEN_AUTH` 改为 `true`，刷新页面，然后粘贴上面 `backend/scripts/dev_token.py` 签发的 token。这个入口只在 Vite 开发模式出现；token 仅保存在当前页面内存，刷新或退出即清除。演示 token 一小时后过期，届时需重新签发。前端会引导管理员创建未开通的租户，也可以直接使用上面的 API 步骤。
+
+“订单诊断”页使用合成订单数据；先按上面的 `seed_demo_orders.py` 命令为当前租户写入演示订单。诊断接口是同步响应，页面会显示执行中状态，完成后展示业务事实、知识库引用；管理员可在“运行轨迹”页查看步骤摘要、耗时和 token 用量。
 
 如需对接企业 OIDC，在 `frontend/.env.local` 配置 `VITE_OIDC_AUTHORITY`、`VITE_OIDC_CLIENT_ID` 和可选的 `VITE_OIDC_SCOPE`。客户端使用 Authorization Code + PKCE，回调地址为 `<前端地址>/auth/callback`。身份服务还须签发后端接受的 RS256 JWT，包含 `sub`、`tenant_id`、`role`、`iss`、`aud`、`iat` 和 `exp`，并配置相同的签名公钥、issuer、audience；仅配置前端 OIDC 地址无法完成后端认证。生产环境需将 `/api` 与前端设为同源，或在可信反向代理中转发 API 请求。
 

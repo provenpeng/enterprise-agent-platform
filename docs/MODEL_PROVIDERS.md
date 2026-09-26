@@ -11,6 +11,8 @@ ollama pull nomic-embed-text
 ollama pull qwen2.5:1.5b-instruct
 ```
 
+需要更强的本地质量对照时，再运行 `ollama pull qwen2.5:7b-instruct`。
+
 在根目录 `.env` 中配置本机运行的后端：
 
 ```dotenv
@@ -26,13 +28,17 @@ CHAT_DISABLE_THINKING=false
 CHAT_STRUCTURED_OUTPUT_METHOD=json_schema
 ```
 
-如果 API 与 worker 在 Docker Compose 容器内运行，把两个 `127.0.0.1` 改为 `host.docker.internal`；容器中的 `127.0.0.1` 不指向宿主机。执行本地真实模型测试需在 `backend/` 安装 `.[test]` 依赖、启动 PostgreSQL，然后从仓库根目录运行：
+如果 API 与 worker 在 Docker Compose 容器内运行，把两个 `127.0.0.1` 改为 `host.docker.internal`；容器中的 `127.0.0.1` 不指向宿主机。部分 macOS 安装的 Ollama 只监听宿主机回环地址，容器即使用 `host.docker.internal` 也可能无法连接。此时可在受控的本地网络上临时运行 `OLLAMA_HOST=0.0.0.0:11435 ollama serve`，先从容器测试连通性；若 Docker Desktop 的主机别名仍不可用，再使用宿主机局域网地址和 `11435` 端口。该监听地址会开放给局域网，评测后应停止临时实例。API、worker 与评测运行器必须配置同一个 Embedding URL，否则向量空间标识不同，语料预检会拒绝评分。
+
+执行本地真实模型测试需在 `backend/` 安装 `.[test]` 依赖、启动 PostgreSQL，然后从仓库根目录运行：
 
 ```bash
 EAP_LIVE_MODELS=1 backend/.venv/bin/pytest -q backend/tests/test_live_model_pipeline.py
 ```
 
 该测试在临时数据库中创建租户知识库、上传示例规则，使用真实 Embedding 完成索引，并经过检索、结构化问答和诊断；聊天模型可以是 Ollama 或下述兼容服务，普通测试套件会跳过它。`nomic-embed-text` 原生输出 768 维，服务将尾部补零至现有的 1536 维 pgvector 列。补零保持同一向量空间内的余弦距离；检索按索引时记录的向量空间标识过滤。
+
+1.5B 模型适合快速跑通链路，不宜作为问答质量基准。固定合成数据集上的 [本地实测](AGENT_TRACES_EVAL.md) 显示，7B 模型配合 10 个候选时明显改善引用与拒答，但诊断仍未达到可靠质量门槛。切换聊天模型只需修改 `ANSWER_MODEL` 并重启 API，无需重建 Embedding 索引。
 
 ## AIHubMix 免费聊天模型
 

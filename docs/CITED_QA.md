@@ -1,13 +1,13 @@
 # 带来源引用的知识库问答
 
-`POST /api/v1/knowledge-bases/{id}/ask` 使用与检索接口相同的租户授权和活动索引版本范围。请求包括 `query`、可选的 `top_k`（默认 5、最大 10）和 `min_score`（默认 0.5）。`admin` 与 `viewer` 均可调用。
+`POST /api/v1/knowledge-bases/{id}/ask` 使用与检索接口相同的租户授权和活动索引版本范围。请求包括 `query`、可选的 `top_k`（默认及最大值均为 10）和 `min_score`（默认 0.5）。`admin` 与 `viewer` 均可调用。实测默认取 5 个片段会漏掉相关政策章节，因此问答默认扩展到 10 个候选；调用方可显式调低 `top_k` 控制上下文长度与模型成本。
 
 ```json
-{"query":"退款需要谁批准？","top_k":5,"min_score":0.5}
+{"query":"退款需要谁批准？","top_k":10,"min_score":0.5}
 ```
 
 服务先检索候选分片，再通过 LangChain `ChatOpenAI` 的结构化输出让模型返回回答与引用的 chunk ID。服务端只接受本次授权检索结果内的引用，按模型给出的引用顺序去重并编号；最终回答中的 `来源：[1]` 等标记由服务端追加，响应的 `citations` 中提供对应的文档、页码、章节、分片正文和分数。模型不能自己指定文档路径或引用元数据。
 
-没有检索证据时不调用生成模型。模型未给出回答、未引用证据或引用了结果集之外的 chunk 时，统一返回 `grounded: false`、空引用和“根据当前知识库资料，无法确定答案。”。模型超时或故障返回 503，不把供应商异常暴露给调用方。`ANSWER_MODEL` 默认 `gpt-4o-mini`，`ANSWER_GENERATION_TIMEOUT_SECONDS` 默认 30 秒；API 进程需要 `OPENAI_API_KEY`。
+没有检索证据时不调用生成模型。模型未给出回答、未引用证据或引用了结果集之外的 chunk 时，统一返回 `grounded: false`、空引用和“根据当前知识库资料，无法确定答案。”。模型超时或故障返回 503，不把供应商异常暴露给调用方。`ANSWER_MODEL` 默认 `gpt-4o-mini`，`ANSWER_GENERATION_TIMEOUT_SECONDS` 默认 30 秒；API 进程需要 `CHAT_API_KEY` 或回退使用 `OPENAI_API_KEY`。
 
 来源内容在提示中作为不可信数据提供，系统提示要求模型忽略其中的指令。服务端验证引用 ID 的归属与版本，**不能自动证明回答中的每个事实都被引用内容支持**。聊天模型可使用独立的 `CHAT_API_KEY` 和 `CHAT_API_BASE_URL`，配置见 [模型接入](MODEL_PROVIDERS.md)。上线前应建立人工标注的问答评测集，监控拒答率、引用准确率和事实支持率；高风险场景仍需人工核验。数据库集成测试使用假 Embedding 与假生成器，不访问外部模型。

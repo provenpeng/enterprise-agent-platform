@@ -20,13 +20,19 @@ event: delta
 data: {"text":"退款申请","provisional":true}
 
 event: final
-data: {"knowledge_base_id":"...","answer":"...","grounded":true,"citations":[...]}
+data: {"knowledge_base_id":"...","conversation_id":"...","answer":"...","grounded":true,"citations":[...]}
 ```
 
 `delta` 是**临时草稿**，尚未通过完整 JSON 和引用校验。客户端只有收到一次 `final` 后才能把 `final.answer` 与 `final.citations` 作为正式结果，并应以它们替换草稿；`final` 也可能是拒答。模型在响应头发出后失败或超时，服务发送 `error` 事件（`code: ANSWER_GENERATION_FAILED`），不再发送 `final`，客户端应丢弃草稿。连接在 `final` 或 `error` 前断开也视为失败；用户主动取消时关闭读取并中止请求。服务端会关闭上游模型流并释放并发槽。流式响应设置 `Cache-Control: no-cache, no-transform` 和 `X-Accel-Buffering: no`，部署网关仍需允许 SSE 透传，不得缓冲事件。不同模型的 token 边界不同，不保证每个 `delta` 对应一个字或词。
 检索没有证据时，首个 `status.phase` 为 `no_evidence`，随后直接发送拒答 `final`，不会调用聊天模型。响应头之后的生成故障仍保持 HTTP 200，但访问日志的 `failure_type` 记录为 `AnswerGenerationFailed`，便于按请求 ID 定位。
 
 没有检索证据时不调用生成模型。模型未给出回答、未引用证据或引用了结果集之外的 chunk 时，统一返回 `grounded: false`、空引用和“根据当前知识库资料，无法确定答案。”。同步接口的模型超时或故障返回 503；流式接口在响应头发出后通过 `error` 事件报告生成故障，均不暴露供应商异常。`ANSWER_MODEL` 默认 `gpt-4o-mini`，`ANSWER_GENERATION_TIMEOUT_SECONDS` 默认 30 秒；API 进程需要 `CHAT_API_KEY` 或回退使用 `OPENAI_API_KEY`。
+
+## 对话历史
+
+同步和流式问答都接受可选的 `conversation_id`。省略时，首个正式回答会创建会话；传入时只允许继续当前租户、当前用户、当前知识库的会话，其他 ID 返回 404。响应和流式 `final` 返回会话 ID。服务端将问题、正式回答、`grounded` 状态和引用快照作为一轮原子提交；证据不足的正式拒答也会保存。临时 `delta`、生成错误及未完成的请求不会生成历史轮次。持久化在发送 `final` 前完成；若连接恰好在提交后断开，用户仍可从历史中恢复该轮回答。
+
+`GET /api/v1/knowledge-bases/{id}/conversations` 按最近更新倒序列出当前用户的会话，支持 `limit`（默认 20，最大 100）和 `offset`。`GET /api/v1/knowledge-bases/{id}/conversations/{conversation_id}` 返回会话详情及最近的轮次；轮次也用 `limit` 和 `offset` 分页，`has_older` 表示还有更早记录。`DELETE` 同一路径删除会话及所有轮次。管理员也只能看自己的问答历史；运行轨迹仍使用独立的管理员接口。历史引用保存当时核验过的来源快照，不会随文档重新索引而改写。每次提问独立检索当前知识库，历史问题和答案不加入模型上下文。
 
 来源内容在提示中作为不可信数据提供，系统提示要求模型忽略其中的指令。服务端验证引用 ID 的归属与版本，**不能自动证明回答中的每个事实都被引用内容支持**。聊天模型可使用独立的 `CHAT_API_KEY` 和 `CHAT_API_BASE_URL`，配置见 [模型接入](MODEL_PROVIDERS.md)。上线前应建立人工标注的问答评测集，监控拒答率、引用准确率和事实支持率；高风险场景仍需人工核验。数据库集成测试使用假 Embedding 与假生成器，不访问外部模型。
 

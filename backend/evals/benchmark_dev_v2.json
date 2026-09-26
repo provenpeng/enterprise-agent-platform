@@ -1,0 +1,57 @@
+{
+  "version": "synthetic-policy-dev-v2",
+  "corpus": [
+    {"filename": "refund_policy.md", "path": "corpus/refund_policy.md", "sha256": "cd3498a61a146fedc8fd0120fb407908f7323eefc3cdaa12f4ea1e00582a4a96"},
+    {"filename": "returns_policy.md", "path": "corpus/returns_policy.md", "sha256": "a3e75d9f4bae0ac316c244151ca516ed9d395a8fe26f4ed351fa7ae634f28740"},
+    {"filename": "expense_policy.md", "path": "corpus/expense_policy.md", "sha256": "5232371abdeffa408a9039be696eab887ced7f7febcf11f86b03e6611fbeed89"}
+  ],
+  "sources": {
+    "refund_window": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "申请时限"]},
+    "refund_approval": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "审批责任"]},
+    "refund_balance": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "可退余额"]},
+    "refund_processing": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "处理时间"]},
+    "refund_exclusions": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "不可退款情形"]},
+    "refund_window_error": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "演示失败原因", "REFUND_WINDOW_EXPIRED"]},
+    "refund_amount_error": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "演示失败原因", "AMOUNT_EXCEEDS_REFUNDABLE"]},
+    "refund_gateway_error": {"filename": "refund_policy.md", "section_path": ["客户退款政策", "演示失败原因", "GATEWAY_TIMEOUT"]},
+    "returns_window": {"filename": "returns_policy.md", "section_path": ["商品退货与换货政策", "退货时限"]},
+    "returns_exchange": {"filename": "returns_policy.md", "section_path": ["商品退货与换货政策", "换货条件"]},
+    "returns_shipping": {"filename": "returns_policy.md", "section_path": ["商品退货与换货政策", "物流费用"]},
+    "expense_deadline": {"filename": "expense_policy.md", "section_path": ["员工费用报销政策", "提交时限"]},
+    "expense_approval": {"filename": "expense_policy.md", "section_path": ["员工费用报销政策", "审批责任"]},
+    "expense_invoice": {"filename": "expense_policy.md", "section_path": ["员工费用报销政策", "票据要求"]}
+  },
+  "retrieval": [
+    {"id": "dev_balance_remaining", "category": "paraphrase", "query": "原付款扣除以前退掉的钱以后，还能按原价申请全额退款吗？", "relevant_source_ids": ["refund_balance"]},
+    {"id": "dev_balance_cap", "category": "paraphrase", "query": "客户又填了一笔退款，金额高于这单现在剩下能退的部分，规则怎么限制？", "relevant_source_ids": ["refund_balance"]},
+    {"id": "dev_refund_processing", "category": "confusable", "query": "审批已经通过，资金处理通常要几个工作日？", "relevant_source_ids": ["refund_processing"]},
+    {"id": "dev_return_clock", "category": "confusable", "query": "退实物商品的十四天应从收到货还是付钱时起算？", "relevant_source_ids": ["returns_window"]},
+    {"id": "dev_refund_clock", "category": "confusable", "query": "客户要退订单款项，三十天应从哪一步开始计时？", "relevant_source_ids": ["refund_window"]},
+    {"id": "dev_expense_approver", "category": "confusable", "query": "差旅费申请的批准人是运营还是员工的上级？", "relevant_source_ids": ["expense_approval"]},
+    {"id": "dev_refund_approver", "category": "confusable", "query": "顾客的退款材料由客服收齐后，最终审核权在谁手里？", "relevant_source_ids": ["refund_approval"]},
+    {"id": "dev_invoice", "category": "direct", "query": "内部报销材料应包含哪些票据？", "relevant_source_ids": ["expense_invoice"]},
+    {"id": "dev_no_answer_sso", "category": "no_answer", "query": "公司单点登录令牌的有效期是多少小时？", "relevant_source_ids": [], "expect_no_hits": true, "min_score": 0.75},
+    {"id": "dev_no_answer_stock", "category": "no_answer", "query": "员工股票期权的归属期是几年？", "relevant_source_ids": [], "expect_no_hits": true, "min_score": 0.75}
+  ],
+  "qa": [
+    {"id": "dev_qa_balance", "query": "一笔订单已退过部分款项，再申请退款时金额上限如何确定？", "required_source_ids": ["refund_balance"]},
+    {"id": "dev_qa_return_clock", "query": "收到商品后想退货，期限有多长，从何时起算？", "required_source_ids": ["returns_window"]},
+    {"id": "dev_qa_invoice", "query": "员工递交没有发票的报销单会怎样？", "required_source_ids": ["expense_invoice"]},
+    {"id": "dev_qa_compare_clocks", "query": "订单退款与实物退货各自从什么时间点开始计算申请期限？", "required_source_ids": ["refund_window", "returns_window"]},
+    {"id": "dev_qa_compare_approvers", "query": "客户申请退款、员工提交差旅报销，分别由谁批准？", "required_source_ids": ["refund_approval", "expense_approval"]},
+    {"id": "dev_qa_compare_thirties", "query": "客户退款和员工报销都提到三十天，请分别说明起算事件。", "required_source_ids": ["refund_window", "expense_deadline"]},
+    {"id": "dev_qa_no_answer_sso", "query": "公司的单点登录令牌如何续期？", "required_source_ids": [], "expect_abstain": true},
+    {"id": "dev_qa_no_answer_stock", "query": "员工期权什么时候归属？", "required_source_ids": [], "expect_abstain": true}
+  ],
+  "diagnostic": [
+    {"id": "dev_diag_window", "question": "DEMO-WINDOW 这笔退款被拒时对应哪条失败原因规则？", "order_id": "DEMO-WINDOW", "expected_reason_code": "REFUND_WINDOW_EXPIRED", "expect_policy_search": true, "expected_status": "ANSWERED", "required_source_ids": ["refund_window_error"]},
+    {"id": "dev_diag_amount", "question": "请根据 DEMO-AMOUNT 的退款记录说明应核对什么。", "order_id": "DEMO-AMOUNT", "expected_reason_code": "AMOUNT_EXCEEDS_REFUNDABLE", "expect_policy_search": true, "expected_status": "ANSWERED", "required_source_ids": ["refund_amount_error"]},
+    {"id": "dev_diag_gateway", "question": "DEMO-GATEWAY 的退款处理失败后应先确认哪件事？", "order_id": "DEMO-GATEWAY", "expected_reason_code": "GATEWAY_TIMEOUT", "expect_policy_search": true, "expected_status": "ANSWERED", "required_source_ids": ["refund_gateway_error"]},
+    {"id": "dev_diag_success", "question": "DEMO-SUCCESS 是否已经退款成功？", "order_id": "DEMO-SUCCESS", "expected_reason_code": null, "expect_policy_search": false, "expected_status": "BUSINESS_FACTS_ONLY", "required_source_ids": []}
+  ],
+  "authorization": [
+    {"id": "dev_foreign_search", "endpoint": "search", "query": "客户退款金额的限制是什么？"},
+    {"id": "dev_foreign_ask", "endpoint": "ask", "query": "商品退货的期限是多少？"},
+    {"id": "dev_foreign_diagnose", "endpoint": "diagnose", "query": "DEMO-AMOUNT 为什么失败？", "order_id": "DEMO-AMOUNT"}
+  ]
+}

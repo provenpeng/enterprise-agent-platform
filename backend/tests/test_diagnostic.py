@@ -96,7 +96,7 @@ async def create_context(
             content="支付后 30 天内可申请退款。",
             token_count=10,
             metadata_={
-                "section_path": ["退款规则"],
+                "section_path": ["退款规则", "REFUND_WINDOW_EXPIRED"],
                 "embedding_model": "text-embedding-3-small",
                 "embedding_space_id": space_id,
             },
@@ -220,13 +220,45 @@ async def test_diagnostic_short_circuits_missing_order_and_status_only(api_clien
 
     model.order_id = "DEMO-WINDOW"
     model.search_policy = True
+    # The exact business reason remains valid evidence even when the vector
+    # model assigns an orthogonal score to its short policy paragraph.
     embeddings.embed_query = lambda text: (
         [0.0, 1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 2)
     )
-    no_policy = await client.post(path, json={"question": "DEMO-WINDOW 为什么失败？"})
-    assert no_policy.json()["status"] == "BUSINESS_FACTS_ONLY"
-    assert no_policy.json()["citations"] == []
+    exact_policy = await client.post(
+        path, json={"question": "DEMO-WINDOW 为什么失败？"}
+    )
+    assert exact_policy.json()["status"] == "ANSWERED"
+    assert len(exact_policy.json()["citations"]) == 1
     assert embeddings.calls == 1
+    assert model.explain_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_does_not_explain_reason_from_unrelated_policy(api_client):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_context(
+        client, sessions, settings.embedding_space_id
+    )
+    async with sessions() as db:
+        chunk = await db.get(Chunk, chunk_id)
+        chunk.metadata_ = {
+            **chunk.metadata_,
+            "section_path": ["退款规则", "GATEWAY_TIMEOUT"],
+        }
+        await db.commit()
+
+    model = FixedDiagnosticModel("DEMO-WINDOW", search_policy=True)
+    app.dependency_overrides[get_diagnostic_model] = lambda: model
+    app.dependency_overrides[get_query_embeddings] = lambda: FixedEmbeddings()
+    response = await client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/diagnose",
+        json={"question": "DEMO-WINDOW 为什么退款失败？"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "BUSINESS_FACTS_ONLY"
+    assert response.json()["citations"] == []
+    assert "REFUND_WINDOW_EXPIRED" in response.json()["answer"]
     assert model.explain_calls == 0
 
 

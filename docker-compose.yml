@@ -27,7 +27,7 @@ services:
 
   api:
     image: enterprise-agent-backend:local
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       DOCUMENT_PROCESSING_BACKEND: ${DOCUMENT_PROCESSING_BACKEND:-manual}

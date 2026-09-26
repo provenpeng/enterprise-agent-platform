@@ -26,6 +26,7 @@ def test_chat_settings_fall_back_to_openai_and_normalize_compose_defaults() -> N
 def test_gateway_config_reaches_both_chat_adapters(monkeypatch) -> None:
     calls = []
     structured_calls = []
+    streaming_calls = []
 
     class FakeChat:
         def __init__(self, **kwargs):
@@ -33,6 +34,10 @@ def test_gateway_config_reaches_both_chat_adapters(monkeypatch) -> None:
 
         def with_structured_output(self, *args, **kwargs):
             structured_calls.append(kwargs)
+            return object()
+
+        def bind(self, **kwargs):
+            streaming_calls.append(kwargs)
             return object()
 
     monkeypatch.setattr(chat_module, "ChatOpenAI", FakeChat)
@@ -58,6 +63,7 @@ def test_gateway_config_reaches_both_chat_adapters(monkeypatch) -> None:
     assert len(structured_calls) == 3
     assert all(call["method"] == "json_mode" for call in structured_calls)
     assert all("strict" not in call for call in structured_calls)
+    assert streaming_calls == [{"response_format": {"type": "json_object"}}]
     assert "gateway-key" not in repr(config)
 
 

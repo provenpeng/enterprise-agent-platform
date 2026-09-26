@@ -1,6 +1,8 @@
 """End-to-end cited answer contract with deterministic model substitutes."""
 
 import asyncio
+import json
+import logging
 import uuid
 
 import pytest
@@ -9,6 +11,7 @@ from langchain_core.embeddings import Embeddings
 
 from app.api.answer_provider import get_answer_generator
 from app.api.embedding_provider import get_query_embeddings
+from app.api.model_admission import ModelAdmissionGate, get_model_admission_gate
 from app.main import app
 from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
@@ -16,7 +19,8 @@ from app.models.knowledge_base import KnowledgeBase
 from app.models.tenant import Tenant
 from app.rag.answer_generator import AnswerDraft
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
-from app.services.answer import NO_ANSWER
+from app.schemas.retrieval import SearchHit
+from app.services.answer import NO_ANSWER, stream_answer
 
 
 class FixedEmbeddings(Embeddings):
@@ -49,6 +53,33 @@ class FixedGenerator:
         return AnswerDraft(
             answer="需要经理批准。", cited_chunk_ids=[str(hits[0].chunk_id)]
         )
+
+
+class FixedStreamingGenerator(FixedGenerator):
+    def __init__(self, draft: AnswerDraft | None = None, *, fail: bool = False) -> None:
+        super().__init__(draft)
+        self.fail = fail
+
+    async def stream(self, question: str, hits: list):
+        self.calls += 1
+        yield "需要"
+        if self.fail:
+            raise RuntimeError("provider details must not reach the client")
+        yield "经理批准。"
+        yield self.draft or AnswerDraft(
+            answer="需要经理批准。", cited_chunk_ids=[str(hits[0].chunk_id)]
+        )
+
+
+def parse_sse(body: str) -> list[tuple[str, dict]]:
+    frames = [frame for frame in body.strip().split("\n\n") if frame]
+    return [
+        (
+            frame.split("\n", 1)[0].removeprefix("event: "),
+            json.loads(frame.split("data: ", 1)[1]),
+        )
+        for frame in frames
+    ]
 
 
 async def create_source(client, sessions, space_id: str) -> tuple[uuid.UUID, uuid.UUID]:
@@ -113,6 +144,149 @@ async def test_ask_returns_server_verified_citation(api_client):
     assert body["citations"][0]["source"]["page_number"] == 2
     assert body["citations"][0]["source"]["section_path"] == ["政策", "退款"]
     assert embeddings.calls == generator.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_ask_stream_marks_deltas_provisional_and_verifies_final_source(
+    api_client,
+):
+    client, engine, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+
+    class PoolCheckingGenerator(FixedStreamingGenerator):
+        async def stream(self, question: str, hits: list):
+            assert engine.pool.checkedout() == 0
+            async for update in super().stream(question, hits):
+                yield update
+
+    embeddings, generator = FixedEmbeddings(), PoolCheckingGenerator()
+    app.dependency_overrides[get_query_embeddings] = lambda: embeddings
+    app.dependency_overrides[get_answer_generator] = lambda: generator
+    path = f"/api/v1/knowledge-bases/{knowledge_base_id}/ask/stream"
+    response = await client.post(path, json={"query": "谁批准退款？"})
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert response.headers["cache-control"] == "no-cache, no-transform"
+    events = parse_sse(response.text)
+    assert [event for event, _ in events] == ["status", "delta", "delta", "final"]
+    assert all(data["provisional"] for event, data in events if event == "delta")
+    assert events[-1][1]["grounded"] is True
+    assert events[-1][1]["citations"][0]["source"]["chunk_id"] == str(chunk_id)
+    assert embeddings.calls == generator.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_ask_stream_retracts_provisional_text_when_citation_is_invalid(
+    api_client,
+):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _ = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+    app.dependency_overrides[get_query_embeddings] = lambda: FixedEmbeddings()
+    app.dependency_overrides[get_answer_generator] = lambda: FixedStreamingGenerator(
+        AnswerDraft(answer="需要经理批准。", cited_chunk_ids=[str(uuid.uuid4())])
+    )
+
+    response = await client.post(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/ask/stream",
+        json={"query": "谁批准退款？"},
+    )
+    events = parse_sse(response.text)
+    assert any(event == "delta" for event, _ in events)
+    assert events[-1][0] == "final"
+    assert events[-1][1]["grounded"] is False
+    assert events[-1][1]["citations"] == []
+    assert events[-1][1]["answer"] == NO_ANSWER
+
+
+@pytest.mark.asyncio
+async def test_ask_stream_abstains_or_errors_without_exposing_provider_details(
+    api_client,
+    caplog,
+):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _ = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+    embeddings = FixedEmbeddings()
+    generator = FixedStreamingGenerator(fail=True)
+    gate = ModelAdmissionGate(1, 0.01)
+    app.dependency_overrides[get_model_admission_gate] = lambda: gate
+    app.dependency_overrides[get_query_embeddings] = lambda: embeddings
+    app.dependency_overrides[get_answer_generator] = lambda: generator
+    path = f"/api/v1/knowledge-bases/{knowledge_base_id}/ask/stream"
+
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        failed_generation = await client.post(path, json={"query": "退款"})
+    assert failed_generation.status_code == 200
+    assert [event for event, _ in parse_sse(failed_generation.text)] == [
+        "status",
+        "delta",
+        "error",
+    ]
+    assert "provider details" not in failed_generation.text
+    access_log = [
+        json.loads(record.getMessage())
+        for record in caplog.records
+        if record.name == "uvicorn.error" and record.getMessage().startswith("{")
+    ][-1]
+    assert access_log["status"] == 200
+    assert access_log["failure_type"] == "AnswerGenerationFailed"
+
+    embeddings.embed_query = lambda text: (
+        [0.0, 1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 2)
+    )
+    abstained = await client.post(path, json={"query": "不相关", "min_score": 0.5})
+    assert [event for event, _ in parse_sse(abstained.text)] == ["status", "final"]
+    assert parse_sse(abstained.text)[-1][1]["grounded"] is False
+    assert generator.calls == 1
+
+    outsider = {
+        "Authorization": f"Bearer {make_token('outsider', tenant_id=str(uuid.uuid4()))}"
+    }
+    forbidden = await client.post(path, json={"query": "退款"}, headers=outsider)
+    assert forbidden.status_code == 404
+    assert generator.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_stream_answer_closes_model_stream_on_cancellation():
+    closed = asyncio.Event()
+
+    class WaitingGenerator:
+        async def stream(self, question: str, hits: list):
+            try:
+                yield "provisional"
+                await asyncio.sleep(60)
+            finally:
+                closed.set()
+
+    hit = SearchHit(
+        chunk_id=uuid.uuid4(),
+        document_id=uuid.uuid4(),
+        document_name="policy.md",
+        index_version=1,
+        chunk_index=0,
+        content="规则",
+        score=1,
+        page_number=None,
+        section_title=None,
+        section_path=[],
+    )
+    updates = stream_answer(
+        WaitingGenerator(),
+        knowledge_base_id=uuid.uuid4(),
+        question="问题",
+        hits=[hit],
+        generation_timeout_seconds=30,
+    )
+    assert await anext(updates) == "provisional"
+    await updates.aclose()
+    assert closed.is_set()
 
 
 @pytest.mark.asyncio

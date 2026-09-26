@@ -28,7 +28,40 @@ CHAT_DISABLE_THINKING=false
 CHAT_STRUCTURED_OUTPUT_METHOD=json_schema
 ```
 
-如果 API 与 worker 在 Docker Compose 容器内运行，把两个 `127.0.0.1` 改为 `host.docker.internal`；容器中的 `127.0.0.1` 不指向宿主机。部分 macOS 安装的 Ollama 只监听宿主机回环地址，容器即使用 `host.docker.internal` 也可能无法连接。此时可在受控的本地网络上临时运行 `OLLAMA_HOST=0.0.0.0:11435 ollama serve`，先从容器测试连通性；若 Docker Desktop 的主机别名仍不可用，再使用宿主机局域网地址和 `11435` 端口。该监听地址会开放给局域网，评测后应停止临时实例。API、worker 与评测运行器必须配置同一个 Embedding URL，否则向量空间标识不同，语料预检会拒绝评分。
+### macOS Docker Compose 与宿主机 Ollama
+
+容器的 `127.0.0.1` 指向容器自身。本机实测 Docker Desktop 的 `host.docker.internal` 访问 Ollama 会断开，但宿主机局域网地址可以连接。保留已有的 `11434` 实例，在另一个终端启动专门供容器访问的实例：
+
+```bash
+OLLAMA_HOST=0.0.0.0:11435 ollama serve
+```
+
+确认宿主机当前局域网 IP 后，在被 Git 忽略的 `.env` 中设置以下值；`CHAT_*` 可以继续使用 DeepSeek，也可以指向同一 Ollama 实例。`0.0.0.0` 会允许局域网连接，只应在可信网络上使用，完成本地验证后可停止该终端中的实例。
+
+```dotenv
+EMBEDDING_API_KEY=ollama
+EMBEDDING_API_BASE_URL=http://<宿主机局域网IP>:11435/v1
+EMBEDDING_PROVIDER_ID=local-ollama-nomic
+EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_NATIVE_DIMENSIONS=768
+```
+
+启动 API 和索引 worker：
+
+```bash
+docker build -t enterprise-agent-backend:local ./backend
+docker compose --profile indexing up -d --force-recreate api indexer
+```
+
+按 README 生成与 `TENANT_ID` 对应的管理员 token 并设置 `EAP_EVAL_TOKEN`，然后在仓库根目录运行真正经过容器 API 和 worker 的 smoke test：
+
+```bash
+EMBEDDING_API_BASE_URL=http://127.0.0.1:11435/v1 \
+  backend/.venv/bin/python backend/scripts/smoke_compose_models.py \
+  --tenant-id "$TENANT_ID"
+```
+
+脚本先验证宿主机 Embedding，上传固定语料并等待容器 worker 发布索引，再通过容器 API 检查检索、带来源问答和诊断。它会核对 worker 发布的空间 ID 与宿主机配置一致；成功时仅打印检查项和新知识库 ID，不打印密钥。`EMBEDDING_PROVIDER_ID` 是同一模型权重的**逻辑身份**，允许宿主机使用回环 URL 而容器使用局域网 URL。不同供应商或不同权重不得复用同一个 ID；权重变化时必须更新 `EMBEDDING_REVISION` 并重建索引。切换到显式 provider ID 会改变原先按 URL 生成的空间 ID，旧索引需按下文流程重建。
 
 执行本地真实模型测试需在 `backend/` 安装 `.[test]` 依赖、启动 PostgreSQL，然后从仓库根目录运行：
 
@@ -68,7 +101,7 @@ CHAT_DISABLE_THINKING=false
 
 Embedding 独立配置。若继续用本地 Ollama Embedding，保留上述 `EMBEDDING_*` 配置；若使用另一种 Embedding 模型，应配置其实际原生维度。当前存储列上限为 1536 维，不支持更高维度的模型。
 
-向量空间标识由 Embedding 接口 URL、模型名、原生维度和 `EMBEDDING_REVISION` 计算；它不包含密钥。服务无法探测同一 URL 和模型名背后的权重是否发生变化，因此供应商更换权重或本地模型文件后，运维人员必须显式修改 `EMBEDDING_REVISION`。API 与 worker 的上述四项配置必须一致；待处理任务与 worker 的空间不一致时会失败，需用当前配置重新入队。
+默认向量空间标识由 Embedding 接口 URL、模型名、原生维度和 `EMBEDDING_REVISION` 计算；配置 `EMBEDDING_PROVIDER_ID` 后，改用该逻辑身份代替接口 URL，其余参数仍参与计算。标识不包含密钥。服务无法探测同一逻辑身份背后的权重是否变化，因此供应商更换权重或本地模型文件后，运维人员必须显式修改 `EMBEDDING_REVISION`。API、worker 和评测运行器的逻辑身份、模型名、维度与 revision 必须一致；待处理任务与 worker 的空间不一致时会失败，需用当前配置重新入队。
 
 切换任一空间参数后重启 API 和 worker，并为需要检索的文档创建重建任务。旧活动版本在重新索引前不会参与新空间的检索；索引失败时，旧版本仍保留，恢复旧配置后可再次检索。聊天模型切换不要求重建索引。
 

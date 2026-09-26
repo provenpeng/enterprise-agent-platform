@@ -59,6 +59,21 @@ def _business_facts(order: OrderSnapshot) -> str:
     return f"订单 {order.order_id} 最近一次退款状态为 {latest.status.value}。"
 
 
+def _reason_code_evidence(order: OrderSnapshot, hit: SearchHit) -> str:
+    """Present recorded business state and the matched policy text without inference.
+
+    The snapshot has an order creation time, but no payment time. A language
+    model can otherwise mistake it for the start of a refund window and assert
+    a contradictory elapsed-time calculation.
+    """
+    latest = order.refund_attempts[-1]
+    return (
+        f"订单 {order.order_id} 最近一次退款状态为 {latest.status.value}，"
+        f"业务原因代码为 {latest.reason_code}。"
+        f"知识库中对应的规则原文：{hit.content.strip()}"
+    )
+
+
 def _after_plan(state: DiagnosticState) -> str:
     return END if "response" in state else "lookup_order"
 
@@ -187,11 +202,37 @@ class DiagnosticWorkflow:
     async def _compose(self, state: DiagnosticState) -> DiagnosticState:
         order = state["order"]
         hits = state.get("hits", [])
+        latest_reason = (
+            order.refund_attempts[-1].reason_code if order.refund_attempts else None
+        )
         async with self._recorder.step(
             "compose", {"candidate_chunk_ids": [str(hit.chunk_id) for hit in hits]}
         ) as trace:
             if not hits:
+                composition = "business_facts"
                 response = self._business_only(order)
+            elif latest_reason:
+                # Retrieval already restricted these active, tenant-scoped hits
+                # to the exact trusted reason code. Quoting the rule prevents a
+                # model from turning a source citation into unsupported facts.
+                cited = attach_verified_citations(
+                    _reason_code_evidence(order, hits[0]),
+                    [str(hits[0].chunk_id)],
+                    hits,
+                )
+                if cited is None:
+                    composition = "business_facts"
+                    response = self._business_only(order)
+                else:
+                    composition = "reason_code_evidence"
+                    answer, citations = cited
+                    response = DiagnoseResponse(
+                        knowledge_base_id=self._options.knowledge_base_id,
+                        status="ANSWERED",
+                        answer=answer,
+                        order=order,
+                        citations=citations,
+                    )
             else:
                 try:
                     async with asyncio.timeout(
@@ -210,8 +251,10 @@ class DiagnosticWorkflow:
                 )
                 if cited is None:
                     logger.info("Diagnostic explanation lacked valid policy citations")
+                    composition = "business_facts"
                     response = self._business_only(order)
                 else:
+                    composition = "model"
                     answer, citations = cited
                     response = DiagnoseResponse(
                         knowledge_base_id=self._options.knowledge_base_id,
@@ -222,6 +265,7 @@ class DiagnosticWorkflow:
                     )
             trace.output = {
                 "status": response.status,
+                "composition": composition,
                 "cited_chunk_ids": [
                     str(item.source.chunk_id) for item in response.citations
                 ],

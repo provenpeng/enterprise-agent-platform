@@ -1,7 +1,7 @@
 """Idempotent, explicit synthetic data for business workflow demonstrations."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -64,6 +64,9 @@ async def seed_demo_orders(db: AsyncSession, tenant_id: uuid.UUID) -> int:
         raise ValueError("Tenant does not exist")
     inserted = 0
     for order_id, payment, total, refundable, status, reason, amount in DEMO_CASES:
+        attempt_at = DEMO_TIMESTAMP + timedelta(
+            days=32 if reason == "REFUND_WINDOW_EXPIRED" else 1
+        )
         result = await db.execute(
             insert(DemoOrder)
             .values(
@@ -91,10 +94,13 @@ async def seed_demo_orders(db: AsyncSession, tenant_id: uuid.UUID) -> int:
                 status=status,
                 reason_code=reason,
                 amount_cents=amount,
-                created_at=DEMO_TIMESTAMP,
+                created_at=attempt_at,
             )
-            .on_conflict_do_nothing(
-                index_elements=["tenant_id", "order_id", "attempt_number"]
+            .on_conflict_do_update(
+                index_elements=["tenant_id", "order_id", "attempt_number"],
+                # Repair older synthetic fixtures where all attempts had the
+                # order creation timestamp, including the expired-window case.
+                set_={"created_at": attempt_at},
             )
         )
     await db.commit()

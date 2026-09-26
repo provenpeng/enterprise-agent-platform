@@ -1,0 +1,18 @@
+{
+  "name": "synthetic-policy-holdout-gate-v1",
+  "dataset_version": "synthetic-policy-holdout-v1",
+  "thresholds": {
+    "retrieval_recall_at_1": 0.70,
+    "retrieval_recall_at_5": 0.90,
+    "retrieval_mrr_at_5": 0.75,
+    "retrieval_no_hit_rate": 1.00,
+    "qa_citation_source_accuracy": 0.90,
+    "qa_abstention_accuracy": 1.00,
+    "diagnostic_order_lookup_accuracy": 1.00,
+    "diagnostic_reason_code_accuracy": 1.00,
+    "diagnostic_policy_route_accuracy": 1.00,
+    "diagnostic_status_accuracy": 1.00,
+    "diagnostic_citation_source_accuracy": 1.00,
+    "tenant_isolation_accuracy": 1.00
+  }
+}

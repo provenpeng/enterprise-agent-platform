@@ -5,7 +5,41 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+METRIC_NAMES = frozenset(
+    {
+        "retrieval_recall_at_1",
+        "retrieval_recall_at_5",
+        "retrieval_mrr_at_5",
+        "retrieval_no_hit_rate",
+        "qa_citation_source_accuracy",
+        "qa_abstention_accuracy",
+        "diagnostic_order_lookup_accuracy",
+        "diagnostic_reason_code_accuracy",
+        "diagnostic_policy_route_accuracy",
+        "diagnostic_status_accuracy",
+        "diagnostic_citation_source_accuracy",
+        "tenant_isolation_accuracy",
+    }
+)
+
+
+class QualityProfile(BaseModel):
+    name: str = Field(min_length=1)
+    dataset_version: str = Field(min_length=1)
+    thresholds: dict[str, float]
+
+    @field_validator("thresholds")
+    @classmethod
+    def validate_thresholds(cls, value: dict[str, float]) -> dict[str, float]:
+        if set(value) != METRIC_NAMES or any(
+            not 0 < threshold <= 1 for threshold in value.values()
+        ):
+            raise ValueError(
+                "Quality profile needs a nonzero threshold for every metric"
+            )
+        return value
 
 
 class CorpusDocument(BaseModel):
@@ -156,6 +190,16 @@ def load_benchmark(path: Path) -> tuple[BenchmarkDataset, str]:
     return dataset, hashlib.sha256(raw).hexdigest()
 
 
+def load_quality_profile(
+    path: Path, dataset_version: str
+) -> tuple[QualityProfile, str]:
+    raw = path.read_bytes()
+    profile = QualityProfile.model_validate_json(raw)
+    if profile.dataset_version != dataset_version:
+        raise ValueError("Quality profile targets a different dataset version")
+    return profile, hashlib.sha256(raw).hexdigest()
+
+
 def relevant_rank(
     hits: list[dict], expected_sources: tuple[str, ...], source_by_chunk: dict[str, str]
 ) -> int | None:
@@ -287,9 +331,20 @@ def compare_baseline(report: dict, baseline_path: Path, tolerance: float) -> lis
 
 
 def assess_quality_gate(
-    metrics: dict[str, float], *, min_score: float, regressions: list[str]
+    metrics: dict[str, float],
+    *,
+    min_score: float,
+    regressions: list[str],
+    thresholds: dict[str, float] | None = None,
 ) -> dict:
-    below_threshold = [name for name, value in metrics.items() if value < min_score]
+    if thresholds is not None and set(thresholds) != set(metrics):
+        raise ValueError("Quality profile does not match report metrics")
+    effective = (
+        thresholds if thresholds is not None else dict.fromkeys(metrics, min_score)
+    )
+    below_threshold = [
+        name for name, value in metrics.items() if value < effective[name]
+    ]
     mandatory_failures = (
         ["tenant_isolation_accuracy"]
         if metrics["tenant_isolation_accuracy"] != 1.0
@@ -297,6 +352,7 @@ def assess_quality_gate(
     )
     return {
         "min_score": min_score,
+        "thresholds": effective,
         "below_threshold": below_threshold,
         "mandatory_failures": mandatory_failures,
         "passed": not below_threshold and not mandatory_failures and not regressions,

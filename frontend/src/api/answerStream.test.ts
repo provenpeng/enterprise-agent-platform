@@ -3,6 +3,7 @@ import { streamAnswer } from "./answerStream";
 
 const final = {
   knowledge_base_id: "00000000-0000-0000-0000-000000000001",
+  conversation_id: "00000000-0000-0000-0000-000000000002",
   answer: "退款需要审批 [1]。",
   grounded: true,
   citations: [{ number: 1, source: {

@@ -4,6 +4,7 @@ from app.api.routes import (
     agent_runs,
     answer,
     business,
+    conversations,
     diagnostic,
     documents,
     health,
@@ -20,6 +21,7 @@ api_router.include_router(tenants.router)
 api_router.include_router(knowledge_bases.router)
 api_router.include_router(retrieval.router)
 api_router.include_router(answer.router)
+api_router.include_router(conversations.router)
 api_router.include_router(business.router)
 api_router.include_router(diagnostic.router)
 api_router.include_router(agent_runs.router)

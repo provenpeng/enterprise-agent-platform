@@ -1,7 +1,14 @@
 from sqlalchemy import UniqueConstraint
 
 from app.db.base import Base
-from app.models import Chunk, Document, DocumentStatus, IndexJob
+from app.models import (
+    Chunk,
+    Conversation,
+    ConversationTurn,
+    Document,
+    DocumentStatus,
+    IndexJob,
+)
 
 
 def test_domain_tables_and_cascading_foreign_keys() -> None:
@@ -15,11 +22,20 @@ def test_domain_tables_and_cascading_foreign_keys() -> None:
         "demo_refund_attempts",
         "agent_runs",
         "agent_run_steps",
+        "conversations",
+        "conversation_turns",
     }
     assert next(iter(Document.__table__.foreign_keys)).ondelete == "CASCADE"
     assert next(iter(Chunk.__table__.foreign_keys)).ondelete == "CASCADE"
     assert "embedding" in Chunk.__table__.columns
     assert next(iter(IndexJob.__table__.foreign_keys)).ondelete == "CASCADE"
+    assert next(iter(ConversationTurn.__table__.foreign_keys)).ondelete == "CASCADE"
+    assert {
+        fk.target_fullname: fk.ondelete for fk in Conversation.__table__.foreign_keys
+    } == {
+        "tenants.id": "RESTRICT",
+        "knowledge_bases.id": "CASCADE",
+    }
     assert "tenant_id" not in Document.__table__.columns
 
 

@@ -4,6 +4,8 @@ import type { components, paths } from "./schema";
 export type KnowledgeBase = components["schemas"]["KnowledgeBaseRead"];
 export type Document = components["schemas"]["DocumentRead"];
 export type Answer = components["schemas"]["AskResponse"];
+export type ConversationSummary = components["schemas"]["ConversationSummary"];
+export type ConversationDetail = components["schemas"]["ConversationDetail"];
 export type SearchHit = components["schemas"]["SearchHit"];
 export type Identity = components["schemas"]["IdentityRead"];
 export type Tenant = components["schemas"]["TenantRead"];
@@ -143,6 +145,36 @@ export async function getAgentRun(token: string, runId: string): Promise<AgentRu
   });
   if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取运行轨迹"));
   return data;
+}
+
+export async function listConversations(
+  token: string, knowledgeBaseId: string, offset: number, limit = 20,
+): Promise<ConversationSummary[]> {
+  const { data, error, response } = await api(token).GET(
+    "/api/v1/knowledge-bases/{knowledge_base_id}/conversations",
+    { params: { path: { knowledge_base_id: knowledgeBaseId }, query: { offset, limit } } },
+  );
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取对话历史"));
+  return data;
+}
+
+export async function getConversation(
+  token: string, knowledgeBaseId: string, conversationId: string, offset: number, limit = 20,
+): Promise<ConversationDetail> {
+  const { data, error, response } = await api(token).GET(
+    "/api/v1/knowledge-bases/{knowledge_base_id}/conversations/{conversation_id}",
+    { params: { path: { knowledge_base_id: knowledgeBaseId, conversation_id: conversationId }, query: { offset, limit } } },
+  );
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法打开对话历史"));
+  return data;
+}
+
+export async function deleteConversation(token: string, knowledgeBaseId: string, conversationId: string): Promise<void> {
+  const { error, response } = await api(token).DELETE(
+    "/api/v1/knowledge-bases/{knowledge_base_id}/conversations/{conversation_id}",
+    { params: { path: { knowledge_base_id: knowledgeBaseId, conversation_id: conversationId } } },
+  );
+  if (!response.ok) throw new ApiError(response.status, detail(error, "无法删除对话"));
 }
 
 export async function uploadDocument(

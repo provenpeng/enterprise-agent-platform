@@ -19,8 +19,11 @@ from app.models.knowledge_base import KnowledgeBase
 from app.models.tenant import Tenant
 from app.rag.answer_generator import AnswerDraft
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
+from app.schemas.answer import AskResponse
 from app.schemas.retrieval import SearchHit
 from app.services.answer import NO_ANSWER, stream_answer
+from app.services.conversations import append_verified_turn
+from app.services.errors import NotFound
 
 
 class FixedEmbeddings(Embeddings):
@@ -201,6 +204,12 @@ async def test_ask_stream_retracts_provisional_text_when_citation_is_invalid(
     assert events[-1][1]["grounded"] is False
     assert events[-1][1]["citations"] == []
     assert events[-1][1]["answer"] == NO_ANSWER
+    saved = await client.get(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/conversations/{events[-1][1]['conversation_id']}"
+    )
+    assert saved.status_code == 200
+    assert saved.json()["turns"][0]["answer"] == NO_ANSWER
+    assert saved.json()["turns"][0]["citations"] == []
 
 
 @pytest.mark.asyncio
@@ -229,6 +238,10 @@ async def test_ask_stream_abstains_or_errors_without_exposing_provider_details(
         "error",
     ]
     assert "provider details" not in failed_generation.text
+    history = await client.get(
+        f"/api/v1/knowledge-bases/{knowledge_base_id}/conversations"
+    )
+    assert history.json() == []
     access_log = [
         json.loads(record.getMessage())
         for record in caplog.records
@@ -305,7 +318,9 @@ async def test_ask_abstains_without_evidence_or_valid_citations(api_client):
         [0.0, 1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 2)
     )
     no_evidence = await client.post(path, json={"query": "unrelated", "min_score": 0.5})
-    assert no_evidence.json() == {
+    no_evidence_body = no_evidence.json()
+    assert uuid.UUID(no_evidence_body.pop("conversation_id"))
+    assert no_evidence_body == {
         "knowledge_base_id": str(knowledge_base_id),
         "answer": NO_ANSWER,
         "grounded": False,
@@ -439,3 +454,143 @@ async def test_ask_releases_db_connection_during_external_model_calls(api_client
     )
     assert response.status_code == 200, response.text
     assert response.json()["grounded"] is True
+
+
+@pytest.mark.asyncio
+async def test_conversation_history_restores_verified_turns_and_is_owner_scoped(
+    api_client,
+):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+    embeddings, generator = FixedEmbeddings(), FixedStreamingGenerator()
+    app.dependency_overrides[get_query_embeddings] = lambda: embeddings
+    app.dependency_overrides[get_answer_generator] = lambda: generator
+    base = f"/api/v1/knowledge-bases/{knowledge_base_id}"
+    viewer = {"Authorization": f"Bearer {make_token('test-user', role='viewer')}"}
+
+    first = await client.post(
+        f"{base}/ask", json={"query": "谁批准退款？"}, headers=viewer
+    )
+    assert first.status_code == 200, first.text
+    conversation_id = first.json()["conversation_id"]
+    assert uuid.UUID(conversation_id)
+    second = await client.post(
+        f"{base}/ask/stream",
+        json={"query": "再问一次", "conversation_id": conversation_id},
+        headers=viewer,
+    )
+    assert second.status_code == 200
+    assert parse_sse(second.text)[-1][1]["conversation_id"] == conversation_id
+
+    summaries = (await client.get(f"{base}/conversations", headers=viewer)).json()
+    assert len(summaries) == 1
+    assert summaries[0]["title"] == "谁批准退款？"
+    restored = (
+        await client.get(f"{base}/conversations/{conversation_id}", headers=viewer)
+    ).json()
+    assert [turn["question"] for turn in restored["turns"]] == [
+        "谁批准退款？",
+        "再问一次",
+    ]
+    assert restored["turns"][0]["answer"] == first.json()["answer"]
+    assert restored["turns"][0]["citations"][0]["source"]["chunk_id"] == str(chunk_id)
+    assert restored["turns"][1]["grounded"] is True
+
+    tenant_id = uuid.uuid5(uuid.NAMESPACE_URL, "enterprise-agent-platform:test-user")
+    other_user = {
+        "Authorization": f"Bearer {make_token('colleague', tenant_id=str(tenant_id))}"
+    }
+    assert (await client.get(f"{base}/conversations", headers=other_user)).json() == []
+    assert (
+        await client.get(f"{base}/conversations/{conversation_id}", headers=other_user)
+    ).status_code == 404
+    calls_before = embeddings.calls
+    assert (
+        await client.post(
+            f"{base}/ask",
+            json={"query": "steal", "conversation_id": conversation_id},
+            headers=other_user,
+        )
+    ).status_code == 404
+    assert embeddings.calls == calls_before
+    assert (
+        await client.delete(
+            f"{base}/conversations/{conversation_id}", headers=other_user
+        )
+    ).status_code == 404
+    other_base = await client.post(
+        "/api/v1/knowledge-bases", json={"name": "Other knowledge base"}
+    )
+    assert other_base.status_code == 201
+    calls_before = embeddings.calls
+    assert (
+        await client.post(
+            f"/api/v1/knowledge-bases/{other_base.json()['id']}/ask",
+            json={"query": "wrong base", "conversation_id": conversation_id},
+        )
+    ).status_code == 404
+    assert embeddings.calls == calls_before
+
+    removed = await client.delete(
+        f"{base}/conversations/{conversation_id}", headers=viewer
+    )
+    assert removed.status_code == 204
+    assert (await client.get(f"{base}/conversations", headers=viewer)).json() == []
+    assert (
+        await client.get(f"{base}/conversations/{conversation_id}", headers=viewer)
+    ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_conversation_turn_pages_are_bounded_and_newest_first(api_client):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _ = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+    app.dependency_overrides[get_query_embeddings] = lambda: FixedEmbeddings()
+    app.dependency_overrides[get_answer_generator] = lambda: FixedGenerator()
+    base = f"/api/v1/knowledge-bases/{knowledge_base_id}"
+    conversation_id = None
+    for question in ("问题一", "问题二", "问题三"):
+        result = await client.post(
+            f"{base}/ask", json={"query": question, "conversation_id": conversation_id}
+        )
+        assert result.status_code == 200, result.text
+        conversation_id = result.json()["conversation_id"]
+
+    latest = (
+        await client.get(f"{base}/conversations/{conversation_id}?limit=2")
+    ).json()
+    assert [turn["question"] for turn in latest["turns"]] == ["问题二", "问题三"]
+    assert latest["has_older"] is True
+    older = (
+        await client.get(f"{base}/conversations/{conversation_id}?limit=2&offset=2")
+    ).json()
+    assert [turn["question"] for turn in older["turns"]] == ["问题一"]
+    assert older["has_older"] is False
+
+
+@pytest.mark.asyncio
+async def test_conversation_writer_checks_knowledge_base_tenant(api_client):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, _ = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+    async with sessions() as db:
+        with pytest.raises(NotFound):
+            await append_verified_turn(
+                db,
+                tenant_id=uuid.uuid4(),
+                owner_sub="test-user",
+                knowledge_base_id=knowledge_base_id,
+                conversation_id=None,
+                question="问题",
+                answer=AskResponse(
+                    knowledge_base_id=knowledge_base_id,
+                    answer=NO_ANSWER,
+                    grounded=False,
+                    citations=[],
+                ),
+            )

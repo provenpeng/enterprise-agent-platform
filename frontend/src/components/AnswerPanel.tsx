@@ -3,6 +3,7 @@ import { Alert, Button, Card, Empty, Input, Space, Tag, Typography } from "antd"
 import { SendOutlined, StopOutlined } from "@ant-design/icons";
 import { streamAnswer } from "../api/answerStream";
 import { errorMessage, type Answer } from "../api/client";
+import { CitationList } from "./CitationList";
 
 const { TextArea } = Input;
 
@@ -97,24 +98,7 @@ export function AnswerPanel({ token, knowledgeBaseId }: { token: string; knowled
             {answer.grounded ? "已校验引用" : "证据不足"}
           </Tag>
           <Typography.Paragraph className="answer-text">{answer.answer}</Typography.Paragraph>
-          {answer.citations.length > 0 && (
-            <section aria-label="回答来源" className="sources">
-              <Typography.Title level={5}>来源</Typography.Title>
-              {answer.citations.map(({ number, source }) => (
-                <Card key={`${number}-${source.chunk_id}`} size="small" className="source-card">
-                  <div className="source-heading">
-                    <strong>[{number}] {source.document_name}</strong>
-                    <Space wrap size={4}>
-                      {source.section_path.length > 0 && <Tag>{source.section_path.join(" / ")}</Tag>}
-                      {source.section_path.length === 0 && source.section_title && <Tag>{source.section_title}</Tag>}
-                      {source.page_number !== null && <Tag>第 {source.page_number} 页</Tag>}
-                    </Space>
-                  </div>
-                  <Typography.Paragraph className="source-content">{source.content}</Typography.Paragraph>
-                </Card>
-              ))}
-            </section>
-          )}
+          <CitationList citations={answer.citations} />
         </div>
       )}
       {!answer && !running && !error && <Empty className="answer-empty" description="选择知识库并提问，回答和出处会显示在这里" />}

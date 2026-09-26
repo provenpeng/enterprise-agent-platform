@@ -97,7 +97,7 @@ alembic check
 pytest -q
 ```
 
-CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像。测试使用确定性的假模型；[版本化 RAG 与 Agent 基准](docs/AGENT_TRACES_EVAL.md)可在显式启动模型后生成可比较的检索、引用、拒答和跨租户报告。另有冻结的留出集与逐指标质量门槛，当前本地 7B 和 DeepSeek 的实测均未通过，逐例结果与限制见评测文档。合成数据集不能代表真实业务质量。
+CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像。测试使用确定性的假模型；[版本化 RAG 与 Agent 基准](docs/AGENT_TRACES_EVAL.md)可在显式启动模型后生成可比较的检索、引用、拒答和跨租户报告。另有冻结的留出集与逐指标质量门槛。有界词项重排后，DeepSeek 的留出集检索已达到 7/7，但问答精确来源仍为 5/6，未通过预设门槛；逐例结果与限制见评测文档。合成数据集不能代表真实业务质量。
 
 在 macOS Docker Compose 中接入宿主机 Ollama 时，按[模型接入说明](docs/MODEL_PROVIDERS.md#macos-docker-compose-与宿主机-ollama)配置可达地址，并运行 `backend/scripts/smoke_compose_models.py` 验证 Embedding、容器索引 worker、检索、问答及诊断。
 

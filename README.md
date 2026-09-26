@@ -9,7 +9,7 @@
 | 文档处理 | TXT、Markdown、文本型 PDF；手动实现与 LangChain 实现可按索引任务切换，输出相同的解析和分片契约 |
 | 持久化索引 | PostgreSQL 任务租约、失败重试、版本原子发布；pgvector 存储 1536 维向量，支持 OpenAI 兼容 Embedding 接口 |
 | 租户隔离 | RS256 JWT 中的 `tenant_id` 决定访问范围；知识库、检索、订单和运行轨迹均按租户查询 |
-| 检索与问答 | 仅检索已发布版本及当前 Embedding 向量空间；服务端校验引用 ID 是否属于本次授权结果，证据不足时拒答 |
+| 检索与问答 | 仅检索已发布版本及当前 Embedding 向量空间；同步和 SSE 流式问答共用服务端引用校验，证据不足时拒答 |
 | 订单诊断 | LangGraph 固定路由、只读订单工具、步骤轨迹、token 用量与固定合成数据评测 |
 | 请求可观测性 | 响应关联 ID、脱敏结构化访问日志；诊断运行另有持久化步骤轨迹 |
 | 运行保护 | 模型请求并发容量门、快速可重试的 503、模型阶段超时 |
@@ -74,6 +74,9 @@ curl -fsS -H "Authorization: Bearer $TOKEN" \
 
 ```bash
 curl -fsS -X POST "http://127.0.0.1:8000/api/v1/knowledge-bases/$KB_ID/ask" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"query":"退款需要谁批准？"}'
+curl -N -X POST "http://127.0.0.1:8000/api/v1/knowledge-bases/$KB_ID/ask/stream" \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"query":"退款需要谁批准？"}'
 docker compose run --rm migrate python scripts/seed_demo_orders.py --tenant-id "$TENANT_ID"

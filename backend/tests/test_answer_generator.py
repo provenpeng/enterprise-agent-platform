@@ -3,6 +3,8 @@
 import uuid
 
 import pytest
+from langchain_core.messages import AIMessageChunk
+from langchain_core.output_parsers import JsonOutputParser
 
 from app.rag.answer_generator import LangChainAnswerGenerator, _EvidenceAnswer
 from app.schemas.retrieval import SearchHit
@@ -16,6 +18,15 @@ class FixedChain:
     async def ainvoke(self, messages):
         self.messages = messages
         return self.draft
+
+
+class FixedStream:
+    def __init__(self, pieces: list[str]) -> None:
+        self.pieces = pieces
+
+    async def astream(self, messages):
+        for piece in self.pieces:
+            yield AIMessageChunk(content=piece)
 
 
 def _hit(content: str) -> SearchHit:
@@ -66,3 +77,32 @@ async def test_unknown_label_invalidates_entire_draft():
 
     assert result.answer == ""
     assert result.cited_chunk_ids == []
+
+
+@pytest.mark.asyncio
+async def test_stream_emits_partial_answer_then_maps_only_final_evidence():
+    hit = _hit("退款从支付日计算")
+    generator = object.__new__(LangChainAnswerGenerator)
+    generator._stream_model = FixedStream(
+        ['{"answer":"退', "款\\n从支付日", '计算","cited_evidence_ids":["E1"]}']
+    )
+    generator._partial_json = JsonOutputParser()
+    generator._format_instruction = ""
+
+    updates = [update async for update in generator.stream("何时起算？", [hit])]
+
+    assert "".join(update for update in updates if isinstance(update, str)) == (
+        "退款\n从支付日计算"
+    )
+    assert updates[-1].cited_chunk_ids == [str(hit.chunk_id)]
+
+
+@pytest.mark.asyncio
+async def test_stream_rejects_incomplete_json_after_provisional_text():
+    generator = object.__new__(LangChainAnswerGenerator)
+    generator._stream_model = FixedStream(['{"answer":"临时答案"'])
+    generator._partial_json = JsonOutputParser()
+    generator._format_instruction = ""
+
+    with pytest.raises(ValueError):
+        _ = [update async for update in generator.stream("问题", [_hit("证据")])]

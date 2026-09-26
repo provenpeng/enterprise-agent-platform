@@ -60,6 +60,8 @@ class RequestObservabilityMiddleware:
                 )
             raise
         finally:
+            if failure_type is None:
+                failure_type = scope.get("state", {}).get("stream_failure_type")
             route: Any = scope.get("route")
             route_path = getattr(route, "path", None)
             if (

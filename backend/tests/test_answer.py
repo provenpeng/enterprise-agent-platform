@@ -154,6 +154,47 @@ async def test_ask_abstains_without_evidence_or_valid_citations(api_client):
 
 
 @pytest.mark.asyncio
+async def test_ask_default_can_use_evidence_beyond_fifth_vector_hit(api_client):
+    client, _, sessions, settings = api_client
+    knowledge_base_id, chunk_id = await create_source(
+        client, sessions, settings.embedding_space_id
+    )
+    async with sessions() as db:
+        target = await db.get(Chunk, chunk_id)
+        target.embedding = [0.6, 0.8] + [0.0] * (EMBEDDING_DIMENSIONS - 2)
+        db.add_all(
+            Chunk(
+                document_id=target.document_id,
+                index_version=1,
+                chunk_index=index,
+                content=f"Unrelated policy {index}",
+                token_count=4,
+                metadata_={"embedding_space_id": settings.embedding_space_id},
+                embedding=[1.0] + [0.0] * (EMBEDDING_DIMENSIONS - 1),
+            )
+            for index in range(1, 6)
+        )
+        await db.commit()
+
+    generator = FixedGenerator(
+        AnswerDraft(answer="需要经理批准。", cited_chunk_ids=[str(chunk_id)])
+    )
+    app.dependency_overrides[get_query_embeddings] = lambda: FixedEmbeddings()
+    app.dependency_overrides[get_answer_generator] = lambda: generator
+    path = f"/api/v1/knowledge-bases/{knowledge_base_id}/ask"
+
+    default = await client.post(path, json={"query": "谁批准退款？"})
+    assert default.status_code == 200, default.text
+    assert default.json()["grounded"] is True
+    assert default.json()["citations"][0]["source"]["chunk_id"] == str(chunk_id)
+
+    restricted = await client.post(path, json={"query": "谁批准退款？", "top_k": 5})
+    assert restricted.status_code == 200, restricted.text
+    assert restricted.json()["grounded"] is False
+    assert restricted.json()["answer"] == NO_ANSWER
+
+
+@pytest.mark.asyncio
 async def test_ask_authorizes_before_model_calls_and_bounds_generation(api_client):
     client, _, sessions, settings = api_client
     knowledge_base_id, _ = await create_source(

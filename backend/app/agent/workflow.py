@@ -165,8 +165,11 @@ class DiagnosticWorkflow:
                 embedding_space_id=self._options.embedding_space_id,
                 query=query,
                 top_k=5,
-                min_score=0.5,
+                # An exact reason-code match is stronger evidence than a
+                # provider-specific cosine threshold for a short policy chunk.
+                min_score=0.0 if latest_reason else 0.5,
                 timeout_seconds=self._options.embedding_timeout_seconds,
+                required_term=latest_reason,
             )
             trace.output = {
                 "hits": [

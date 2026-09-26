@@ -5,7 +5,7 @@ import logging
 import uuid
 
 from langchain_core.embeddings import Embeddings
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chunk import Chunk
@@ -29,6 +29,7 @@ async def search_knowledge_base(
     top_k: int,
     min_score: float,
     timeout_seconds: float,
+    required_term: str | None = None,
 ) -> list[SearchHit]:
     try:
         async with asyncio.timeout(timeout_seconds):
@@ -67,8 +68,18 @@ async def search_knowledge_base(
             Chunk.embedding.is_not(None),
             Chunk.metadata_["embedding_space_id"].astext == embedding_space_id,
         )
-        .cte("authorized_chunks")
-        .prefix_with("MATERIALIZED", dialect="postgresql")
+    )
+    if required_term:
+        # A trusted business reason code must be present in the policy heading
+        # or body. Similar vectors for other failure reasons are not evidence.
+        candidates = candidates.where(
+            or_(
+                Chunk.metadata_["section_path"].contains([required_term]),
+                func.strpos(Chunk.content, required_term) > 0,
+            )
+        )
+    candidates = candidates.cte("authorized_chunks").prefix_with(
+        "MATERIALIZED", dialect="postgresql"
     )
     distance = candidates.c.embedding.cosine_distance(vector)
     rows = await db.execute(

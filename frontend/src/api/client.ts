@@ -8,6 +8,9 @@ export type SearchHit = components["schemas"]["SearchHit"];
 export type Identity = components["schemas"]["IdentityRead"];
 export type Tenant = components["schemas"]["TenantRead"];
 export type IndexJob = components["schemas"]["IndexJobRead"];
+export type Diagnosis = components["schemas"]["DiagnoseResponse"];
+export type AgentRunSummary = components["schemas"]["AgentRunSummary"];
+export type AgentRunDetail = components["schemas"]["AgentRunDetail"];
 
 export class ApiError extends Error {
   constructor(
@@ -106,6 +109,39 @@ export async function reindexDocument(token: string, documentId: string): Promis
     params: { path: { document_id: documentId } },
   });
   if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法重新索引文档"));
+  return data;
+}
+
+export async function diagnoseOrder(
+  token: string,
+  knowledgeBaseId: string,
+  question: string,
+  orderId: string | null,
+): Promise<Diagnosis> {
+  const { data, error, response } = await api(token).POST(
+    "/api/v1/knowledge-bases/{knowledge_base_id}/diagnose",
+    {
+      params: { path: { knowledge_base_id: knowledgeBaseId } },
+      body: { question, order_id: orderId },
+    },
+  );
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "订单诊断失败"));
+  return data;
+}
+
+export async function listAgentRuns(token: string, offset: number, limit = 20): Promise<AgentRunSummary[]> {
+  const { data, error, response } = await api(token).GET("/api/v1/agent-runs", {
+    params: { query: { limit, offset } },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取运行记录"));
+  return data;
+}
+
+export async function getAgentRun(token: string, runId: string): Promise<AgentRunDetail> {
+  const { data, error, response } = await api(token).GET("/api/v1/agent-runs/{run_id}", {
+    params: { path: { run_id: runId } },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取运行轨迹"));
   return data;
 }
 

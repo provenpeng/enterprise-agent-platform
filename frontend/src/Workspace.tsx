@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, App, Button, Card, Empty, Input, Layout, Space, Spin, Tag, Typography } from "antd";
+import { Alert, App, Button, Card, Empty, Input, Layout, Space, Spin, Tabs, Tag, Typography } from "antd";
 import { BookOutlined, LogoutOutlined, PlusOutlined } from "@ant-design/icons";
 import {
   ApiError, createKnowledgeBase, createTenant, errorMessage, getCurrentTenant, getIdentity,
@@ -9,6 +9,8 @@ import {
 import { useAuth } from "./auth/authContext";
 import { AnswerPanel } from "./components/AnswerPanel";
 import { DocumentsPanel } from "./components/DocumentsPanel";
+import { DiagnosticPanel } from "./components/DiagnosticPanel";
+import { AgentRunsPanel } from "./components/AgentRunsPanel";
 
 const PAGE_SIZE = 20;
 
@@ -104,6 +106,8 @@ function KnowledgeBases({ token, canWrite, selectedId, onSelect }: {
 
 function Console({ token, name, signOut }: { token: string; name: string; signOut: () => Promise<void> }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("answers");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const identity = useQuery({ queryKey: ["identity"], queryFn: () => getIdentity(token), retry: false });
   const tenant = useQuery({ queryKey: ["tenant"], queryFn: () => getCurrentTenant(token), enabled: identity.isSuccess, retry: false });
   const canWrite = identity.data?.role === "admin";
@@ -138,7 +142,18 @@ function Console({ token, name, signOut }: { token: string; name: string; signOu
               {selectedId ? (
                 <>
                   <DocumentsPanel key={`docs-${selectedId}`} token={token} knowledgeBaseId={selectedId} canWrite={canWrite} />
-                  <AnswerPanel key={`answer-${selectedId}`} token={token} knowledgeBaseId={selectedId} />
+                  <Card className="workspace-card workspace-tabs">
+                    <Tabs
+                      activeKey={activeTab}
+                      onChange={setActiveTab}
+                      destroyOnHidden
+                      items={[
+                        { key: "answers", label: "引用问答", children: <AnswerPanel key={`answer-${selectedId}`} token={token} knowledgeBaseId={selectedId} /> },
+                        { key: "diagnostic", label: "订单诊断", children: <DiagnosticPanel key={`diagnostic-${selectedId}`} token={token} knowledgeBaseId={selectedId} canViewTrace={canWrite} onOpenRun={(runId) => { setSelectedRunId(runId); setActiveTab("runs"); }} /> },
+                        ...(canWrite ? [{ key: "runs", label: "运行轨迹", children: <AgentRunsPanel token={token} selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} /> }] : []),
+                      ]}
+                    />
+                  </Card>
                 </>
               ) : <Card className="workspace-card workspace-placeholder"><Empty description="选择或创建知识库，开始管理文档和提问" /></Card>}
             </main>

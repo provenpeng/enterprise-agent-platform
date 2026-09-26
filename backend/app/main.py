@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
+from app.observability.http import RequestObservabilityMiddleware
 from app.services.errors import (
     Conflict,
     NotFound,
@@ -12,6 +13,7 @@ from app.services.errors import (
 )
 
 app = FastAPI(title="Enterprise Agent Platform")
+app.add_middleware(RequestObservabilityMiddleware, api_prefix=api_router.prefix)
 
 
 @app.exception_handler(ServiceError)

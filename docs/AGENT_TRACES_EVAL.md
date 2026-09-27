@@ -1,14 +1,16 @@
 # Agent 运行轨迹与固定评测
 
-诊断接口返回 `run_id`。服务先提交一条 `RUNNING` 记录，再按 LangGraph 节点逐步持久化 `plan`、`lookup_order`、可选的 `retrieve_policy` 和 `compose`。每一步保存受限输入、输出、耗时、错误类型和模型报告的 token 用量；结束时将运行标记为 `SUCCEEDED` 或 `FAILED`。进程意外退出可能留下 `RUNNING` 记录，便于定位中断，不会伪装为成功。
+诊断接口返回 `run_id`。服务先提交一条 `RUNNING` 记录，再按 LangGraph 节点逐步持久化 `plan`、`lookup_order`、可选的 `retrieve_policy` 和 `compose`。每一步保存输入、输出、耗时、错误类型和模型报告的 token 用量；结束时将运行标记为 `SUCCEEDED` 或 `FAILED`，并保存完整的最终响应及引用快照。进程意外退出可能留下 `RUNNING` 记录，便于定位中断，不会伪装为成功。
 
-只有租户 `admin` 可以调用 `GET /api/v1/agent-runs` 和 `GET /api/v1/agent-runs/{run_id}`。跨租户 ID 统一返回 404；`viewer` 返回 403。运行记录包含原问题和最终回答；步骤只保存订单编号、原因代码及检索命中的 ID、版本和分数，不重复存储订单快照或知识库正文。部署方应配置访问审计，并定期运行保留清理：
+只有租户 `admin` 可以调用 `GET /api/v1/agent-runs` 和 `GET /api/v1/agent-runs/{run_id}` 查看完整审计轨迹；`viewer` 请求这两个接口返回 403。`GET /api/v1/agent-runs/mine?knowledge_base_id=...` 与 `GET /api/v1/agent-runs/mine/{run_id}?knowledge_base_id=...` 只返回登录者本人在当前租户、知识库下的已完成诊断和最终响应，不暴露其他用户的步骤轨迹；跨用户或跨租户 ID 返回 404。工作台可以在刷新后恢复本人结果。
+
+管理员轨迹现在包含订单快照、命中的分片正文与章节、检索分数和最终引用，足以在文档重建索引后复核当时使用的证据。它们可能含敏感业务数据；部署方应限制管理员访问、配置访问审计，并定期运行保留清理：
 
 ```bash
 docker compose run --rm migrate python scripts/prune_agent_runs.py --days 30
 ```
 
-命令删除超过指定天数的运行及其步骤，包括已中断的 `RUNNING` 记录。数据库不保存 API 密钥或供应商原始异常。`total_tokens` 只汇总聊天模型在结构化响应中报告的 token；供应商未报告时为 `null`，目前不包含 Embedding token。
+命令删除超过指定天数的运行、响应快照及其步骤，包括已中断的 `RUNNING` 记录。数据库不保存 API 密钥或供应商原始异常。`total_tokens` 只汇总聊天模型在结构化响应中报告的 token；供应商未报告时为 `null`，目前不包含 Embedding token，界面对此作了明确标注。
 
 ## 轻量演示检查
 
@@ -60,7 +62,7 @@ backend/.venv/bin/python backend/scripts/evaluate_benchmark.py run \
 
 脚本先写完整 JSON 报告，再根据门槛返回非零退出码。只有数据集 SHA-256 一致才允许比较。报告包含每例排名、分片 ID、错误、耗时，以及检索 Recall@1/5、MRR@5、无答案无命中率、问答引用来源准确率和拒答率、诊断步骤与来源准确率、跨租户隔离准确率。引用评分要求命中全部标注章节且不引用其他章节；它不能证明回答的每个语义结论被证据支持。耗时分位数、配置期望值、索引实际空间与处理后端、诊断轨迹报告的模型名和 token 用量也会保存；当前 API 不提供问答与 Embedding 的 token 用量。
 
-CI 用假模型和 HTTP 模拟结果验证基准评分、语料契约及失败报告，并运行现有真实数据库权限与工作流测试；**CI 的确定性分数不是线上语义质量分数**。真实质量基准需显式运行，不进入 CI，也不会自动使用付费模型。
+CI 用假模型和 HTTP 模拟结果验证基准评分、语料契约及失败报告，并运行现有真实数据库权限与工作流测试；**CI 的确定性分数不是线上语义质量分数**。真实质量基准需显式运行，不进入 CI，也不会自动使用付费模型。新增六份长文档、独立验收题及逐条事实支撑复核记录见[多业务验收说明](GENERALIZATION_VALIDATION.md)。
 
 ## 本地 Ollama 实测记录（2026-09-26）
 

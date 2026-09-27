@@ -71,14 +71,14 @@ async def test_live_model_rag_and_diagnosis(api_client) -> None:
 
     search = await client.post(
         f"/api/v1/knowledge-bases/{knowledge_base_id}/search",
-        json={"query": "退款申请需要谁审核？"},
+        json={"query": "客户退款的业务资格由谁最终审批？"},
     )
     assert search.status_code == 200, search.text
-    assert any("运营人员" in hit["content"] for hit in search.json()["hits"])
+    assert any("运营主管" in hit["content"] for hit in search.json()["hits"])
 
     answer = await client.post(
         f"/api/v1/knowledge-bases/{knowledge_base_id}/ask",
-        json={"query": "退款申请需要谁审核？"},
+        json={"query": "客户退款的业务资格由谁最终审批？"},
     )
     assert answer.status_code == 200, answer.text
     assert answer.json()["grounded"] is True, answer.text

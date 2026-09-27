@@ -30,7 +30,16 @@ class AgentRunStatus(str, enum.Enum):
 
 class AgentRun(Base):
     __tablename__ = "agent_runs"
-    __table_args__ = (Index("ix_agent_runs_tenant_started", "tenant_id", "started_at"),)
+    __table_args__ = (
+        Index("ix_agent_runs_tenant_started", "tenant_id", "started_at"),
+        Index(
+            "ix_agent_runs_owner_started",
+            "tenant_id",
+            "owner_sub",
+            "knowledge_base_id",
+            "started_at",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -44,12 +53,14 @@ class AgentRun(Base):
         UUID(as_uuid=True), ForeignKey("knowledge_bases.id", ondelete="SET NULL")
     )
     question: Mapped[str] = mapped_column(Text, nullable=False)
+    owner_sub: Mapped[str | None] = mapped_column(String(255))
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[AgentRunStatus] = mapped_column(
         Enum(AgentRunStatus, name="agent_run_status"), nullable=False
     )
     outcome: Mapped[str | None] = mapped_column(String(40))
     answer: Mapped[str | None] = mapped_column(Text)
+    response_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error_code: Mapped[str | None] = mapped_column(String(100))
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)

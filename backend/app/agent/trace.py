@@ -29,6 +29,7 @@ class RunRecorder:
         tenant_id: uuid.UUID,
         knowledge_base_id: uuid.UUID,
         question: str,
+        owner_sub: str,
         model_name: str,
     ) -> None:
         self._db = db
@@ -38,6 +39,7 @@ class RunRecorder:
             tenant_id=tenant_id,
             knowledge_base_id=knowledge_base_id,
             question=question,
+            owner_sub=owner_sub,
             model_name=model_name,
             status=AgentRunStatus.RUNNING,
         )
@@ -117,6 +119,7 @@ class RunRecorder:
                 status=AgentRunStatus.FAILED if error else AgentRunStatus.SUCCEEDED,
                 outcome=response.status if response else None,
                 answer=response.answer if response else None,
+                response_data=response.model_dump(mode="json") if response else None,
                 error_code=type(error).__name__ if error else None,
                 input_tokens=self._input_tokens if self._has_usage else None,
                 output_tokens=self._output_tokens if self._has_usage else None,

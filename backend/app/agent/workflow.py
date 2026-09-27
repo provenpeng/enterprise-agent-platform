@@ -162,8 +162,16 @@ class DiagnosticWorkflow:
                 "latest_reason_code": latest_attempt.reason_code
                 if latest_attempt
                 else None,
+                "order_snapshot": order.model_dump(mode="json"),
             }
-            return {"order": order}
+            # A recorded failed reason code is stronger routing evidence than
+            # the planner's guess about whether policy lookup is needed.
+            search_policy = state["search_policy"] or bool(
+                latest_attempt
+                and latest_attempt.status.value == "FAILED"
+                and latest_attempt.reason_code
+            )
+            return {"order": order, "search_policy": search_policy}
 
     async def _retrieve(self, state: DiagnosticState) -> DiagnosticState:
         order = state["order"]
@@ -193,6 +201,9 @@ class DiagnosticWorkflow:
                         "document_id": str(hit.document_id),
                         "index_version": hit.index_version,
                         "score": hit.score,
+                        "document_name": hit.document_name,
+                        "section_path": hit.section_path,
+                        "content": hit.content,
                     }
                     for hit in hits
                 ]

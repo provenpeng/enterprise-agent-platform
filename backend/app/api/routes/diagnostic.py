@@ -39,6 +39,7 @@ async def diagnose(
         tenant_id=principal.tenant_id,
         knowledge_base_id=knowledge_base_id,
         question=payload.question,
+        owner_sub=principal.subject,
         model_name=settings.answer_model,
     )
     workflow = DiagnosticWorkflow(

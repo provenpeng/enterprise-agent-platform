@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from app.models.agent_run import AgentRunStatus
+from app.schemas.diagnostic import DiagnoseResponse
 
 
 class AgentRunSummary(BaseModel):
@@ -44,4 +45,18 @@ class AgentRunStepRead(BaseModel):
 
 
 class AgentRunDetail(AgentRunSummary):
+    response_data: DiagnoseResponse | None
     steps: list[AgentRunStepRead]
+
+
+class DiagnosticHistorySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    question: str
+    outcome: str | None
+    started_at: datetime
+
+
+class DiagnosticHistoryDetail(DiagnosticHistorySummary):
+    response: DiagnoseResponse

@@ -213,6 +213,7 @@ async def run_benchmark(
         qa_results.append(
             {
                 "id": case.id,
+                "query": case.query,
                 "expect_abstain": case.expect_abstain,
                 "citation_source": bool(body and body["grounded"])
                 and citations_match(
@@ -222,6 +223,16 @@ async def run_benchmark(
                 else False,
                 "abstained": bool(body and not body["grounded"] and not citations),
                 "cited_chunk_ids": [item["source"]["chunk_id"] for item in citations],
+                "answer": body["answer"] if body else None,
+                "cited_evidence": [
+                    {
+                        "source_id": source_by_chunk.get(item["source"]["chunk_id"]),
+                        "document_name": item["source"]["document_name"],
+                        "section_path": item["source"]["section_path"],
+                        "content": item["source"]["content"],
+                    }
+                    for item in citations
+                ],
                 "latency_ms": latency,
                 "error": error,
             }

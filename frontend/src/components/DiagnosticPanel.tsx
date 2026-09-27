@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Card, Descriptions, Empty, Input, Space, Tag, Typography } from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Alert, Button, Card, Descriptions, Empty, Input, List, Space, Tag, Typography } from "antd";
 import { ApartmentOutlined } from "@ant-design/icons";
-import { diagnoseOrder, errorMessage, type Diagnosis } from "../api/client";
+import { diagnoseOrder, errorMessage, getMyDiagnosis, listMyDiagnoses, type Diagnosis } from "../api/client";
 import { CitationList } from "./CitationList";
 
 const outcome: Record<Diagnosis["status"], { label: string; color: string }> = {
@@ -45,15 +45,37 @@ export function DiagnosticPanel({ token, knowledgeBaseId, canViewTrace, onOpenRu
 }) {
   const [question, setQuestion] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(0);
+  const queryClient = useQueryClient();
+  const history = useQuery({
+    queryKey: ["my-diagnoses", knowledgeBaseId, historyPage],
+    queryFn: () => listMyDiagnoses(token, knowledgeBaseId, historyPage * 10, 10),
+  });
+  const selected = useQuery({
+    queryKey: ["my-diagnosis", knowledgeBaseId, selectedRunId],
+    queryFn: () => getMyDiagnosis(token, knowledgeBaseId, selectedRunId!),
+    enabled: !!selectedRunId,
+  });
   const invalidOrderId = !!orderId.trim() && !/^[A-Za-z0-9-]+$/.test(orderId.trim());
   const diagnosis = useMutation({
     mutationFn: () => diagnoseOrder(token, knowledgeBaseId, question.trim(), orderId.trim() || null),
+    onSuccess: async (created) => {
+      setSelectedRunId(created.run_id || null);
+      setHistoryPage(0);
+      await queryClient.invalidateQueries({ queryKey: ["my-diagnoses", knowledgeBaseId] });
+    },
   });
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (question.trim() && !invalidOrderId && !diagnosis.isPending) diagnosis.mutate();
+    if (question.trim() && !invalidOrderId && !diagnosis.isPending) {
+      setSelectedRunId(null);
+      diagnosis.mutate();
+    }
   }
-  const result = diagnosis.data;
+  const result = selectedRunId
+    ? selected.data?.response || (diagnosis.data?.run_id === selectedRunId ? diagnosis.data : undefined)
+    : diagnosis.data;
   const runId = result?.run_id;
   return (
     <Card className="workspace-card" title="订单诊断 Agent" extra={<Tag color="purple">LangGraph</Tag>}>
@@ -86,6 +108,8 @@ export function DiagnosticPanel({ token, knowledgeBaseId, canViewTrace, onOpenRu
       </form>
       {diagnosis.isError && <Alert className="panel-alert" type="error" showIcon message={errorMessage(diagnosis.error)} />}
       {diagnosis.isPending && <Alert className="panel-alert" type="info" showIcon message="Agent 正在执行，诊断结果将在完成后显示。" />}
+      {selectedRunId && selected.isPending && <Typography.Text type="secondary">正在恢复诊断结果…</Typography.Text>}
+      {selectedRunId && selected.isError && <Alert className="panel-alert" type="error" showIcon message={errorMessage(selected.error)} />}
       {result && !diagnosis.isPending && (
         <section className="answer-result" aria-live="polite">
           <Space wrap>
@@ -98,6 +122,24 @@ export function DiagnosticPanel({ token, knowledgeBaseId, canViewTrace, onOpenRu
         </section>
       )}
       {!result && !diagnosis.isPending && !diagnosis.isError && <Empty className="answer-empty" description="输入订单问题，查看业务事实、规则引用与诊断结论" />}
+      <section className="diagnostic-history" aria-label="诊断历史">
+        <Typography.Title level={5}>我的诊断历史</Typography.Title>
+        {history.isError && <Alert type="error" showIcon message={errorMessage(history.error)} />}
+        <List
+          size="small"
+          loading={history.isPending}
+          dataSource={history.data || []}
+          locale={{ emptyText: "暂无诊断历史" }}
+          renderItem={(item) => <List.Item actions={[<Button key="open" type="link" size="small" onClick={() => setSelectedRunId(item.id)}>恢复结果</Button>]}>
+            <List.Item.Meta title={item.question} description={`${new Date(item.started_at).toLocaleString("zh-CN")} · ${item.outcome || "已完成"}`} />
+          </List.Item>}
+        />
+        {(historyPage > 0 || (history.data?.length || 0) === 10) && <Space>
+          <Button size="small" disabled={historyPage === 0} onClick={() => setHistoryPage((value) => value - 1)}>上一页</Button>
+          <span>第 {historyPage + 1} 页</span>
+          <Button size="small" disabled={(history.data?.length || 0) < 10} onClick={() => setHistoryPage((value) => value + 1)}>下一页</Button>
+        </Space>}
+      </section>
     </Card>
   );
 }

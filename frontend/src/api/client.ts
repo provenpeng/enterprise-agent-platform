@@ -13,6 +13,8 @@ export type IndexJob = components["schemas"]["IndexJobRead"];
 export type Diagnosis = components["schemas"]["DiagnoseResponse"];
 export type AgentRunSummary = components["schemas"]["AgentRunSummary"];
 export type AgentRunDetail = components["schemas"]["AgentRunDetail"];
+export type DiagnosticHistorySummary = components["schemas"]["DiagnosticHistorySummary"];
+export type DiagnosticHistoryDetail = components["schemas"]["DiagnosticHistoryDetail"];
 
 export class ApiError extends Error {
   constructor(
@@ -128,6 +130,26 @@ export async function diagnoseOrder(
     },
   );
   if (!response.ok || !data) throw new ApiError(response.status, detail(error, "订单诊断失败"));
+  return data;
+}
+
+export async function listMyDiagnoses(
+  token: string, knowledgeBaseId: string, offset: number, limit = 20,
+): Promise<DiagnosticHistorySummary[]> {
+  const { data, error, response } = await api(token).GET("/api/v1/agent-runs/mine", {
+    params: { query: { knowledge_base_id: knowledgeBaseId, offset, limit } },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取诊断历史"));
+  return data;
+}
+
+export async function getMyDiagnosis(
+  token: string, knowledgeBaseId: string, runId: string,
+): Promise<DiagnosticHistoryDetail> {
+  const { data, error, response } = await api(token).GET("/api/v1/agent-runs/mine/{run_id}", {
+    params: { path: { run_id: runId }, query: { knowledge_base_id: knowledgeBaseId } },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法恢复诊断结果"));
   return data;
 }
 

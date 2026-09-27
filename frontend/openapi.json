@@ -772,6 +772,139 @@
         }
       }
     },
+    "/api/v1/agent-runs/mine": {
+      "get": {
+        "tags": [
+          "agent-runs"
+        ],
+        "summary": "List My Diagnostics",
+        "operationId": "list_my_diagnostics_api_v1_agent_runs_mine_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "knowledge_base_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Knowledge Base Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DiagnosticHistorySummary"
+                  },
+                  "title": "Response List My Diagnostics Api V1 Agent Runs Mine Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-runs/mine/{run_id}": {
+      "get": {
+        "tags": [
+          "agent-runs"
+        ],
+        "summary": "Get My Diagnostic",
+        "operationId": "get_my_diagnostic_api_v1_agent_runs_mine__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "knowledge_base_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Knowledge Base Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticHistoryDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent-runs": {
       "get": {
         "tags": [
@@ -1430,6 +1563,16 @@
             ],
             "title": "Finished At"
           },
+          "response_data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiagnoseResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "steps": {
             "items": {
               "$ref": "#/components/schemas/AgentRunStepRead"
@@ -1454,6 +1597,7 @@
           "duration_ms",
           "started_at",
           "finished_at",
+          "response_data",
           "steps"
         ],
         "title": "AgentRunDetail"
@@ -2035,6 +2179,84 @@
           "citations"
         ],
         "title": "DiagnoseResponse"
+      },
+      "DiagnosticHistoryDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "response": {
+            "$ref": "#/components/schemas/DiagnoseResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "outcome",
+          "started_at",
+          "response"
+        ],
+        "title": "DiagnosticHistoryDetail"
+      },
+      "DiagnosticHistorySummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "question",
+          "outcome",
+          "started_at"
+        ],
+        "title": "DiagnosticHistorySummary"
       },
       "DocumentRead": {
         "properties": {

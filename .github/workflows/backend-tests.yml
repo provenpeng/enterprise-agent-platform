@@ -65,7 +65,7 @@ jobs:
 
   frontend-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
@@ -88,5 +88,9 @@ jobs:
         run: npm run lint
       - name: Test
         run: npm run test
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser workflow test
+        run: npm run test:e2e
       - name: Build
         run: npm run build

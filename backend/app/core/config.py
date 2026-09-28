@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     diagnostic_planning_timeout_seconds: float = Field(default=10, gt=0, le=60)
     model_max_inflight_requests: int = Field(default=8, ge=1, le=1024)
     model_admission_wait_seconds: float = Field(default=0.1, gt=0, le=30)
+    model_admission_backend: Literal["local", "postgres"] = "local"
 
     @property
     def effective_chat_api_key(self) -> SecretStr | None:

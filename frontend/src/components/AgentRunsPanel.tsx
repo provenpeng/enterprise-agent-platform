@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Card, Descriptions, Empty, Space, Table, Tag, Timeline, Typography } from "antd";
-import { getAgentRun, listAgentRuns, errorMessage, type AgentRunSummary } from "../api/client";
+import { getAgentRun, getAgentRunMetrics, listAgentRuns, errorMessage, type AgentRunSummary } from "../api/client";
 import { CitationList } from "./CitationList";
 
 const PAGE_SIZE = 20;
@@ -38,6 +38,11 @@ export function AgentRunsPanel({ token, selectedRunId, onSelectRun }: {
     queryFn: () => listAgentRuns(token, page * PAGE_SIZE, PAGE_SIZE),
     refetchInterval: (query) => query.state.data?.some((run) => run.status === "RUNNING") ? 3000 : false,
   });
+  const metrics = useQuery({
+    queryKey: ["agent-run-metrics", 24],
+    queryFn: () => getAgentRunMetrics(token, 24),
+    refetchInterval: 30000,
+  });
   const detail = useQuery({
     queryKey: ["agent-run", selectedRunId],
     queryFn: () => getAgentRun(token, selectedRunId!),
@@ -49,6 +54,36 @@ export function AgentRunsPanel({ token, selectedRunId, onSelectRun }: {
   const embeddingEstimate = typeof estimateValue === "number" ? estimateValue : null;
   return (
     <div className="runs-stack">
+      <Card className="workspace-card" title="近 24 小时运行概览" extra={<Button size="small" onClick={() => void metrics.refetch()}>刷新指标</Button>}>
+        <Typography.Paragraph type="secondary">从当前租户持久化的订单诊断轨迹汇总；不含普通检索与问答。Token 仅统计模型实际报告的用量。</Typography.Paragraph>
+        {metrics.isError && <Alert type="error" showIcon message={errorMessage(metrics.error)} />}
+        {metrics.data && (
+          <>
+            <Descriptions size="small" bordered column={{ xs: 1, sm: 2, lg: 4 }}>
+              <Descriptions.Item label="运行总数">{metrics.data.total}</Descriptions.Item>
+              <Descriptions.Item label="成功 / 失败">{metrics.data.succeeded} / {metrics.data.failed}</Descriptions.Item>
+              <Descriptions.Item label="运行中">{metrics.data.running}</Descriptions.Item>
+              <Descriptions.Item label="耗时 p50 / p95">{metrics.data.p50_duration_ms === null ? "—" : `${metrics.data.p50_duration_ms.toFixed(0)} / ${metrics.data.p95_duration_ms?.toFixed(0)} ms`}</Descriptions.Item>
+              <Descriptions.Item label="已报告模型 Token">{metrics.data.reported_model_tokens}</Descriptions.Item>
+              <Descriptions.Item label="成功但未报告用量">{metrics.data.succeeded_without_reported_tokens}</Descriptions.Item>
+            </Descriptions>
+            <Space wrap className="step-meta">{Object.entries(metrics.data.outcomes).map(([name, count]) => <Tag key={name}>{name}: {count}</Tag>)}</Space>
+            <Table
+              size="small"
+              rowKey="name"
+              pagination={false}
+              dataSource={metrics.data.steps}
+              locale={{ emptyText: "暂无步骤指标" }}
+              columns={[
+                { title: "步骤", dataIndex: "name", key: "name", render: (name: string) => stepNames[name] || name },
+                { title: "执行次数", dataIndex: "count", key: "count" },
+                { title: "耗时 p95", key: "p95", render: (_, row) => row.p95_duration_ms === null ? "—" : `${row.p95_duration_ms.toFixed(0)} ms` },
+                { title: "已报告模型 Token", dataIndex: "reported_model_tokens", key: "tokens" },
+              ]}
+            />
+          </>
+        )}
+      </Card>
       <Card className="workspace-card" title="运行记录" extra={<Button size="small" onClick={() => void runs.refetch()}>刷新</Button>}>
         <Typography.Paragraph type="secondary">仅租户管理员可查看。轨迹包含原始问题与结论，请按敏感运行数据管理。</Typography.Paragraph>
         {runs.isError && <Alert type="error" showIcon message={errorMessage(runs.error)} />}

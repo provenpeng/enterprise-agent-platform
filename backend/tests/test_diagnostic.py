@@ -168,6 +168,22 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     assert "answer" not in trace["steps"][3]["output_data"]
     assert trace["steps"][3]["total_tokens"] is None
     assert trace["steps"][3]["output_data"]["composition"] == "reason_code_evidence"
+    metrics_response = await client.get("/api/v1/agent-runs/metrics?hours=24")
+    assert metrics_response.status_code == 200
+    metrics = metrics_response.json()
+    assert (metrics["total"], metrics["succeeded"], metrics["failed"]) == (1, 1, 0)
+    assert metrics["outcomes"] == {"ANSWERED": 1}
+    assert metrics["reported_model_tokens"] == 16
+    assert metrics["p95_duration_ms"] is not None
+    assert {step["name"] for step in metrics["steps"]} == {
+        "plan",
+        "lookup_order",
+        "retrieve_policy",
+        "compose",
+    }
+    assert (
+        await client.get("/api/v1/agent-runs/metrics", headers=viewer)
+    ).status_code == 403
     assert (
         await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=viewer)
     ).status_code == 403
@@ -200,6 +216,9 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
         await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=outsider)
     ).status_code == 404
     assert (await client.get("/api/v1/agent-runs", headers=outsider)).json() == []
+    assert (await client.get("/api/v1/agent-runs/metrics", headers=outsider)).json()[
+        "total"
+    ] == 0
 
     model.order_id = "DEMO-SUCCESS"
     explicit = await client.post(

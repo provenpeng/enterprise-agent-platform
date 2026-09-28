@@ -970,6 +970,56 @@
         }
       }
     },
+    "/api/v1/agent-runs/metrics": {
+      "get": {
+        "tags": [
+          "agent-runs"
+        ],
+        "summary": "Get Agent Run Metrics",
+        "operationId": "get_agent_run_metrics_api_v1_agent_runs_metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 720,
+              "minimum": 1,
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRunMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/agent-runs/{run_id}": {
       "get": {
         "tags": [
@@ -1641,6 +1691,89 @@
         ],
         "title": "AgentRunDetail"
       },
+      "AgentRunMetrics": {
+        "properties": {
+          "window_hours": {
+            "type": "integer",
+            "title": "Window Hours"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          },
+          "succeeded": {
+            "type": "integer",
+            "title": "Succeeded"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "p50_duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Duration Ms"
+          },
+          "p95_duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Duration Ms"
+          },
+          "reported_model_tokens": {
+            "type": "integer",
+            "title": "Reported Model Tokens"
+          },
+          "succeeded_without_reported_tokens": {
+            "type": "integer",
+            "title": "Succeeded Without Reported Tokens"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Outcomes"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AgentStepMetrics"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_hours",
+          "total",
+          "running",
+          "succeeded",
+          "failed",
+          "p50_duration_ms",
+          "p95_duration_ms",
+          "reported_model_tokens",
+          "succeeded_without_reported_tokens",
+          "outcomes",
+          "steps"
+        ],
+        "title": "AgentRunMetrics"
+      },
       "AgentRunStatus": {
         "type": "string",
         "enum": [
@@ -1882,6 +2015,41 @@
           "finished_at"
         ],
         "title": "AgentRunSummary"
+      },
+      "AgentStepMetrics": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "p95_duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Duration Ms"
+          },
+          "reported_model_tokens": {
+            "type": "integer",
+            "title": "Reported Model Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "count",
+          "p95_duration_ms",
+          "reported_model_tokens"
+        ],
+        "title": "AgentStepMetrics"
       },
       "AnswerCitation": {
         "properties": {

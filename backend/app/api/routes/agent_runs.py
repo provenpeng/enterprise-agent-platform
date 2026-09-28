@@ -1,19 +1,22 @@
 """Admin-only access to tenant-scoped diagnostic run history."""
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.auth import Principal, get_principal, require_admin
 from app.db.session import get_db
-from app.models.agent_run import AgentRun
+from app.models.agent_run import AgentRun, AgentRunStatus, AgentRunStep
 from app.schemas.agent_run import (
     AgentRunDetail,
+    AgentRunMetrics,
     AgentRunSummary,
+    AgentStepMetrics,
     DiagnosticHistoryDetail,
     DiagnosticHistorySummary,
 )
@@ -88,6 +91,87 @@ async def list_agent_runs(
         .offset(offset)
     )
     return list(rows)
+
+
+@router.get("/metrics", response_model=AgentRunMetrics)
+async def get_agent_run_metrics(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    principal: Annotated[Principal, Depends(get_principal)],
+    hours: Annotated[int, Query(ge=1, le=720)] = 24,
+) -> AgentRunMetrics:
+    require_admin(principal)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    scope = (
+        AgentRun.tenant_id == principal.tenant_id,
+        AgentRun.started_at >= cutoff,
+    )
+    row = (
+        await db.execute(
+            select(
+                func.count().label("total"),
+                func.count()
+                .filter(AgentRun.status == AgentRunStatus.RUNNING)
+                .label("running"),
+                func.count()
+                .filter(AgentRun.status == AgentRunStatus.SUCCEEDED)
+                .label("succeeded"),
+                func.count()
+                .filter(AgentRun.status == AgentRunStatus.FAILED)
+                .label("failed"),
+                func.percentile_cont(0.5)
+                .within_group(AgentRun.duration_ms)
+                .label("p50"),
+                func.percentile_cont(0.95)
+                .within_group(AgentRun.duration_ms)
+                .label("p95"),
+                func.coalesce(func.sum(AgentRun.total_tokens), 0).label("tokens"),
+                func.count()
+                .filter(
+                    AgentRun.status == AgentRunStatus.SUCCEEDED,
+                    AgentRun.total_tokens.is_(None),
+                )
+                .label("unreported"),
+            ).where(*scope)
+        )
+    ).one()
+    outcome_rows = await db.execute(
+        select(AgentRun.outcome, func.count())
+        .where(*scope, AgentRun.outcome.is_not(None))
+        .group_by(AgentRun.outcome)
+    )
+    step_rows = await db.execute(
+        select(
+            AgentRunStep.name,
+            func.count(),
+            func.percentile_cont(0.95).within_group(AgentRunStep.duration_ms),
+            func.coalesce(func.sum(AgentRunStep.total_tokens), 0),
+        )
+        .join(AgentRun, AgentRun.id == AgentRunStep.run_id)
+        .where(*scope)
+        .group_by(AgentRunStep.name)
+        .order_by(AgentRunStep.name)
+    )
+    return AgentRunMetrics(
+        window_hours=hours,
+        total=row.total,
+        running=row.running,
+        succeeded=row.succeeded,
+        failed=row.failed,
+        p50_duration_ms=row.p50,
+        p95_duration_ms=row.p95,
+        reported_model_tokens=row.tokens,
+        succeeded_without_reported_tokens=row.unreported,
+        outcomes={name: count for name, count in outcome_rows},
+        steps=[
+            AgentStepMetrics(
+                name=name,
+                count=count,
+                p95_duration_ms=p95,
+                reported_model_tokens=tokens,
+            )
+            for name, count, p95, tokens in step_rows
+        ],
+    )
 
 
 @router.get("/{run_id}", response_model=AgentRunDetail)

@@ -14,6 +14,7 @@ export type IndexJob = components["schemas"]["IndexJobRead"];
 export type Diagnosis = components["schemas"]["DiagnoseResponse"];
 export type AgentRunSummary = components["schemas"]["AgentRunSummary"];
 export type AgentRunDetail = components["schemas"]["AgentRunDetail"];
+export type AgentRunMetrics = components["schemas"]["AgentRunMetrics"];
 export type DiagnosticHistorySummary = components["schemas"]["DiagnosticHistorySummary"];
 export type DiagnosticHistoryDetail = components["schemas"]["DiagnosticHistoryDetail"];
 
@@ -185,6 +186,14 @@ export async function listAgentRuns(token: string, offset: number, limit = 20): 
     params: { query: { limit, offset } },
   });
   if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取运行记录"));
+  return data;
+}
+
+export async function getAgentRunMetrics(token: string, hours = 24): Promise<AgentRunMetrics> {
+  const { data, error, response } = await api(token).GET("/api/v1/agent-runs/metrics", {
+    params: { query: { hours } },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取运行指标"));
   return data;
 }
 

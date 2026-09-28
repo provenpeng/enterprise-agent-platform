@@ -4,7 +4,7 @@ import { Alert, App, Button, Card, Drawer, Empty, Popconfirm, Space, Table, Tag,
 import type { UploadFile } from "antd";
 import { DeleteOutlined, EyeOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons";
 import {
-  deleteDocument, errorMessage, listDocumentChunks, listDocuments, listIndexJobs, reindexDocument, uploadDocument,
+  deleteDocument, errorMessage, listDocumentChunks, listDocuments, listIndexJobs, reindexDocument, replaceDocument, uploadDocument,
   type Document,
 } from "../api/client";
 
@@ -15,13 +15,13 @@ const statusText: Record<Document["status"], string> = {
   EMBEDDING: "向量化中", READY: "可检索", FAILED: "索引失败",
 };
 
-function FailedJob({ token, documentId }: { token: string; documentId: string }) {
+function FailedJob({ token, documentId, fallbackAvailable }: { token: string; documentId: string; fallbackAvailable: boolean }) {
   const jobs = useQuery({
     queryKey: ["index-jobs", documentId],
     queryFn: () => listIndexJobs(token, documentId),
   });
   const reason = jobs.data?.[0]?.last_error;
-  return <Tooltip title={reason || "索引失败，可重新提交"}><Tag color="error">索引失败</Tag></Tooltip>;
+  return <Tooltip title={reason || "索引失败，可重新提交"}><Tag color="error">{fallbackAvailable ? "新版失败 · 旧版可检索" : "索引失败"}</Tag></Tooltip>;
 }
 
 export function DocumentsPanel({ token, knowledgeBaseId, canWrite }: {
@@ -52,6 +52,13 @@ export function DocumentsPanel({ token, knowledgeBaseId, canWrite }: {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["documents", knowledgeBaseId] });
       message.success("已重新提交索引任务");
+    },
+  });
+  const replace = useMutation({
+    mutationFn: ({ documentId, file }: { documentId: string; file: File }) => replaceDocument(token, documentId, file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["documents", knowledgeBaseId] });
+      message.success("新版正在索引；旧版仍可检索，完成后自动切换");
     },
   });
   const remove = useMutation({
@@ -96,6 +103,7 @@ export function DocumentsPanel({ token, knowledgeBaseId, canWrite }: {
       )}
       {upload.isError && <Alert type="error" showIcon className="panel-alert" message={errorMessage(upload.error)} />}
       {reindex.isError && <Alert type="error" showIcon className="panel-alert" message={errorMessage(reindex.error)} />}
+      {replace.isError && <Alert type="error" showIcon className="panel-alert" message={errorMessage(replace.error)} />}
       {remove.isError && <Alert type="error" showIcon className="panel-alert" message={errorMessage(remove.error)} />}
       {documents.isError && <Alert type="error" showIcon className="panel-alert" message={errorMessage(documents.error)} />}
       <Table<Document>
@@ -109,14 +117,19 @@ export function DocumentsPanel({ token, knowledgeBaseId, canWrite }: {
         scroll={{ x: 520 }}
         columns={[
           { title: "文件", dataIndex: "filename", key: "filename", ellipsis: true },
-          { title: "索引状态", key: "status", width: 125, render: (_, row) => row.status === "FAILED"
-            ? <FailedJob token={token} documentId={row.id} />
-            : <Tag color={row.status === "READY" ? "success" : "processing"}>{statusText[row.status]}</Tag> },
+          { title: "索引状态", key: "status", width: 195, render: (_, row) => row.status === "FAILED"
+            ? <FailedJob token={token} documentId={row.id} fallbackAvailable={row.active_index_version !== null} />
+            : <Tag color={row.status === "READY" ? "success" : "processing"}>{row.replacement_pending && row.active_index_version !== null ? "替换中 · 旧版可检索" : statusText[row.status]}</Tag> },
           { title: "版本", key: "version", width: 70, render: (_, row) => row.active_index_version ?? "—" },
-          { title: "操作", key: "actions", width: canWrite ? 230 : 90, render: (_: unknown, row: Document) => (
+          { title: "操作", key: "actions", width: canWrite ? 300 : 90, render: (_: unknown, row: Document) => (
             <Space size={0}>
               <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => { setPreview(row); setChunkPage(0); }}>分片</Button>
               {canWrite && (row.status === "FAILED" || row.status === "READY") && <Button type="link" size="small" loading={reindex.isPending && reindex.variables === row.id} onClick={() => reindex.mutate(row.id)}>{row.status === "FAILED" ? "重试" : "重建"}</Button>}
+              {canWrite && !inProgress.has(row.status) && <Upload
+                accept=".txt,.md,.pdf"
+                showUploadList={false}
+                beforeUpload={(file) => { replace.mutate({ documentId: row.id, file }); return false; }}
+              ><Button type="link" size="small" loading={replace.isPending && replace.variables?.documentId === row.id}>替换</Button></Upload>}
               {canWrite && <Popconfirm title="移除这份文档？" description="原文件、索引任务和分片会删除；已保存回答的引用快照仍会保留。" okText="移除" cancelText="取消" onConfirm={() => remove.mutate(row.id)}>
                 <Button type="link" size="small" danger icon={<DeleteOutlined />} loading={remove.isPending && remove.variables === row.id}>移除</Button>
               </Popconfirm>}

@@ -16,5 +16,6 @@ class DocumentRead(BaseModel):
     checksum: str
     status: DocumentStatus
     active_index_version: int | None
+    replacement_pending: bool
     created_at: datetime
     updated_at: datetime

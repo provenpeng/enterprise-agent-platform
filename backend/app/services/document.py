@@ -7,12 +7,13 @@ import uuid
 from pathlib import Path
 from typing import BinaryIO, Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.models.document import Document, DocumentStatus
+from app.models.index_job import IndexJob, IndexJobStatus
 from app.models.knowledge_base import KnowledgeBase
 from app.services.errors import (
     Conflict,
@@ -113,6 +114,13 @@ def _remove_original(destination: Path) -> None:
             break
 
 
+def _stored_path(root: Path, storage_uri: str) -> Path:
+    destination = (root / storage_uri).resolve()
+    if not destination.is_relative_to(root):
+        raise InvalidInput("Invalid stored document path")
+    return destination
+
+
 async def delete_document(
     db: AsyncSession,
     document_id: uuid.UUID,
@@ -134,16 +142,119 @@ async def delete_document(
         await db.rollback()
         raise NotFound("Document not found")
     root = settings.upload_dir.resolve()
-    destination = (root / document.storage_uri).resolve()
-    if not destination.is_relative_to(root):
+    try:
+        destinations = {
+            _stored_path(root, storage_uri)
+            for storage_uri in (
+                document.storage_uri,
+                document.pending_storage_uri,
+                document.archived_storage_uri,
+            )
+            if storage_uri is not None
+        }
+    except InvalidInput:
         await db.rollback()
-        raise InvalidInput("Invalid stored document path")
+        raise
     await db.delete(document)
     await db.commit()
+    for destination in destinations:
+        try:
+            await asyncio.to_thread(_remove_original, destination)
+        except OSError:
+            logger.exception("Could not remove deleted document file: %s", destination)
+
+
+async def replace_document(
+    db: AsyncSession,
+    document_id: uuid.UUID,
+    upload: UploadSource,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> Document:
+    """Stage a new source while the published index remains available."""
+    accessible = await db.scalar(
+        select(Document.id)
+        .join(KnowledgeBase)
+        .where(Document.id == document_id, KnowledgeBase.tenant_id == tenant_id)
+    )
+    await db.rollback()
+    if accessible is None:
+        raise NotFound("Document not found")
+    filename, extension, file_type, checksum = await _inspect_upload(
+        upload, settings.max_upload_size_bytes
+    )
+    document = await db.scalar(
+        select(Document)
+        .join(KnowledgeBase)
+        .where(Document.id == document_id, KnowledgeBase.tenant_id == tenant_id)
+        .with_for_update(of=Document)
+    )
+    if document is None:
+        await db.rollback()
+        raise NotFound("Document not found")
+    active_job = await db.scalar(
+        select(IndexJob.id).where(
+            IndexJob.document_id == document_id,
+            IndexJob.status.in_([IndexJobStatus.PENDING, IndexJobStatus.RUNNING]),
+        )
+    )
+    if active_job is not None:
+        await db.rollback()
+        raise Conflict("Document already has an active index job")
+    duplicate = await db.scalar(
+        select(Document.id).where(
+            Document.knowledge_base_id == document.knowledge_base_id,
+            or_(Document.checksum == checksum, Document.pending_checksum == checksum),
+        )
+    )
+    if duplicate is not None:
+        await db.rollback()
+        raise Conflict("Document with the same checksum already exists")
+
+    latest_version = await db.scalar(
+        select(func.max(IndexJob.index_version)).where(
+            IndexJob.document_id == document_id
+        )
+    )
+    storage_key = f"{document.knowledge_base_id}/{document_id}/replacement-{uuid.uuid4().hex}{extension}"
+    root = settings.upload_dir.resolve()
+    destination = _stored_path(root, storage_key)
+    previous_pending = (
+        _stored_path(root, document.pending_storage_uri)
+        if document.pending_storage_uri
+        else None
+    )
+    committed = False
     try:
-        await asyncio.to_thread(_remove_original, destination)
-    except OSError:
-        logger.exception("Could not remove deleted document file: %s", destination)
+        await asyncio.to_thread(destination.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(_save_original, upload.file, destination, checksum)
+        document.pending_storage_uri = storage_key
+        document.pending_checksum = checksum
+        document.pending_filename = filename
+        document.pending_file_type = file_type
+        document.status = DocumentStatus.UPLOADED
+        db.add(new_index_job(document_id, (latest_version or 0) + 1, settings))
+        await db.commit()
+        committed = True
+        await db.refresh(document)
+    finally:
+        if not committed:
+            await db.rollback()
+            try:
+                await asyncio.to_thread(_remove_original, destination)
+            except OSError:
+                logger.exception(
+                    "Could not remove failed replacement upload: %s", destination
+                )
+    if previous_pending is not None:
+        try:
+            await asyncio.to_thread(_remove_original, previous_pending)
+        except OSError:
+            logger.exception(
+                "Could not remove superseded pending source: %s", previous_pending
+            )
+    return document
 
 
 async def upload_document(
@@ -170,7 +281,7 @@ async def upload_document(
     duplicate = await db.scalar(
         select(Document.id).where(
             Document.knowledge_base_id == knowledge_base_id,
-            Document.checksum == checksum,
+            or_(Document.checksum == checksum, Document.pending_checksum == checksum),
         )
     )
     await db.rollback()
@@ -208,7 +319,10 @@ async def upload_document(
                 duplicate = await db.scalar(
                     select(Document.id).where(
                         Document.knowledge_base_id == knowledge_base_id,
-                        Document.checksum == checksum,
+                        or_(
+                            Document.checksum == checksum,
+                            Document.pending_checksum == checksum,
+                        ),
                     )
                 )
             finally:

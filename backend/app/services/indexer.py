@@ -14,6 +14,7 @@ from app.models.document import DocumentStatus
 from app.rag.embeddings import validate_embedding
 from app.rag.processing import PROCESSING_VERSION, create_document_processor
 from app.rag.types import ChunkCandidate
+from app.services.document import _remove_original, _stored_path
 from app.services.errors import PermanentIndexError
 from app.services.index_jobs import TOKENIZER_NAME
 from app.services.index_store import (
@@ -175,7 +176,15 @@ async def process_one_index_job(
             sessions, settings, claim, source, token_counter
         )
         vectors = await _embed_chunks(sessions, settings, claim, chunks, embeddings)
-        await _publish_index(sessions, claim, chunks, vectors)
+        obsolete_source = await _publish_index(sessions, claim, chunks, vectors)
+        if obsolete_source is not None:
+            try:
+                destination = _stored_path(
+                    settings.upload_dir.resolve(), obsolete_source
+                )
+                await asyncio.to_thread(_remove_original, destination)
+            except Exception:
+                logger.exception("Could not remove obsolete document source")
         logger.info(
             "Indexed document %s version %s", claim.document_id, claim.index_version
         )

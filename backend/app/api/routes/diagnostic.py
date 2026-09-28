@@ -14,6 +14,8 @@ from app.api.auth import Principal, authorized_knowledge_base, get_principal
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
 from app.api.model_admission import model_request_slot
+from app.api.order_provider import get_order_reader
+from app.business.orders import OrderReader
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.knowledge_base import KnowledgeBase
@@ -32,6 +34,7 @@ async def diagnose(
     _model_slot: Annotated[None, Depends(model_request_slot)],
     embeddings: Annotated[Embeddings, Depends(get_query_embeddings)],
     model: Annotated[DiagnosticModel, Depends(get_diagnostic_model)],
+    order_reader: Annotated[OrderReader, Depends(get_order_reader)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> DiagnoseResponse:
     recorder = RunRecorder(
@@ -56,5 +59,6 @@ async def diagnose(
             embedding_timeout_seconds=settings.retrieval_embedding_timeout_seconds,
             generation_timeout_seconds=settings.answer_generation_timeout_seconds,
         ),
+        order_reader,
     )
     return await workflow.run(payload.question)

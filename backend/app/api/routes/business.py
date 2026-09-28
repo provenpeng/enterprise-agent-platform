@@ -3,11 +3,9 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import Principal, get_principal
-from app.business.orders import OrderLookupTool
-from app.db.session import get_db
+from app.api.order_provider import get_order_reader
+from app.business.orders import OrderReader, OrderServiceUnavailable
 from app.schemas.business import OrderSnapshot
 
 router = APIRouter(prefix="/business/orders", tags=["demo-business"])
@@ -18,10 +16,14 @@ async def get_demo_order(
     order_id: Annotated[
         str, Path(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9-]+$")
     ],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    principal: Annotated[Principal, Depends(get_principal)],
+    reader: Annotated[OrderReader, Depends(get_order_reader)],
 ) -> OrderSnapshot:
-    snapshot = await OrderLookupTool(db, principal.tenant_id).lookup(order_id)
+    try:
+        snapshot = await reader.lookup(order_id)
+    except OrderServiceUnavailable as exc:
+        raise HTTPException(
+            status_code=503, detail="Order service is unavailable"
+        ) from exc
     if snapshot is None:
         raise HTTPException(status_code=404, detail="Order not found")
     return snapshot

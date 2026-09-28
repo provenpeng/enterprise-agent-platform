@@ -51,6 +51,10 @@ services:
       MODEL_ADMISSION_WAIT_SECONDS: ${MODEL_ADMISSION_WAIT_SECONDS:-0.1}
       AUTH_ISSUER: ${AUTH_ISSUER:-enterprise-agent-platform}
       AUTH_AUDIENCE: ${AUTH_AUDIENCE:-enterprise-agent-api}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:-}
+      ORDER_API_BASE_URL: ${ORDER_API_BASE_URL:-}
+      ORDER_API_TOKEN: ${ORDER_API_TOKEN:-}
+      ORDER_API_TIMEOUT_SECONDS: ${ORDER_API_TIMEOUT_SECONDS:-3}
       INDEX_TARGET_TOKENS: ${INDEX_TARGET_TOKENS:-400}
       INDEX_MAX_TOKENS: ${INDEX_MAX_TOKENS:-600}
       INDEX_MAX_CHUNKS: ${INDEX_MAX_CHUNKS:-1000}
@@ -90,6 +94,18 @@ services:
       INDEX_POLL_INTERVAL_SECONDS: ${INDEX_POLL_INTERVAL_SECONDS:-2}
     volumes:
       - uploads:/app/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  orders-sandbox:
+    profiles: ["integration"]
+    image: enterprise-agent-backend:local
+    command: ["uvicorn", "app.business.sandbox_api:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ORDER_SANDBOX_TOKEN: ${ORDER_API_TOKEN:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

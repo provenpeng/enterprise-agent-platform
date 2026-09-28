@@ -13,6 +13,7 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     database_url: str
     auth_public_key_path: Path = ROOT_DIR / "config" / "auth-public.pem"
+    auth_jwks_url: AnyHttpUrl | None = None
     auth_issuer: str = "enterprise-agent-platform"
     auth_audience: str = "enterprise-agent-api"
     upload_dir: Path = ROOT_DIR / "data" / "uploads"
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     embedding_native_dimensions: int = Field(default=1536, ge=1, le=1536)
     embedding_revision: str = Field(default="default", min_length=1, max_length=100)
     chat_api_key: SecretStr | None = None
+    order_api_base_url: AnyHttpUrl | None = None
+    order_api_token: SecretStr | None = None
+    order_api_timeout_seconds: float = Field(default=3, gt=0, le=30)
     chat_api_base_url: AnyHttpUrl | None = None
     chat_disable_thinking: bool = False
     chat_structured_output_method: Literal["json_schema", "json_mode"] = "json_schema"
@@ -72,7 +76,13 @@ class Settings(BaseSettings):
             provider_id=self.embedding_provider_id,
         )
 
-    @field_validator("chat_api_base_url", "embedding_api_base_url", mode="before")
+    @field_validator(
+        "chat_api_base_url",
+        "embedding_api_base_url",
+        "auth_jwks_url",
+        "order_api_base_url",
+        mode="before",
+    )
     @classmethod
     def empty_chat_base_url_is_unset(cls, value: str | None) -> str | None:
         return value or None
@@ -86,6 +96,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_index_token_limits(self) -> "Settings":
+        if self.auth_jwks_url and self.auth_jwks_url.scheme != "https":
+            raise ValueError("AUTH_JWKS_URL must use HTTPS")
+        if self.order_api_base_url and not (
+            self.order_api_token and self.order_api_token.get_secret_value()
+        ):
+            raise ValueError("ORDER_API_TOKEN is required with ORDER_API_BASE_URL")
         if self.index_target_tokens > self.index_max_tokens:
             raise ValueError("INDEX_TARGET_TOKENS must not exceed INDEX_MAX_TOKENS")
         if self.index_embedding_timeout_seconds + 30 >= self.index_lease_seconds:

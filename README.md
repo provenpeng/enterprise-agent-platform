@@ -131,6 +131,8 @@ CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查�
 
 在 macOS Docker Compose 中接入宿主机 Ollama 时，按[模型接入说明](docs/MODEL_PROVIDERS.md#macos-docker-compose-与宿主机-ollama)配置可达地址，并运行 `backend/scripts/smoke_compose_models.py` 验证 Embedding、容器索引 worker、检索、问答及诊断。
 
+希望按六份长文档逐项手动检查工作台，可使用[本地完整功能验收步骤](docs/LOCAL_ACCEPTANCE.md)。
+
 ## 设计与限制
 
 - [代码边界与扩展点](docs/ARCHITECTURE.md) · [产品范围](docs/PRODUCT_SPEC.md) · [模型接入](docs/MODEL_PROVIDERS.md) · [租户隔离](docs/TENANCY.md) · [索引状态机](docs/INDEXING.md) · [检索](docs/RETRIEVAL.md) · [带引用问答](docs/CITED_QA.md) · [诊断工作流](docs/DIAGNOSTIC_WORKFLOW.md)

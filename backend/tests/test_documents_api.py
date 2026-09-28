@@ -4,15 +4,81 @@ from io import BytesIO
 from pathlib import Path
 
 import pytest
+from conftest import make_token
 from fastapi import UploadFile
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import Headers
 
+from app.models.chunk import Chunk
 from app.models.document import Document, DocumentStatus
 from app.models.index_job import IndexJob
 from app.services import document as document_service
 from app.services.document import upload_document
+
+
+@pytest.mark.asyncio
+async def test_delete_document_scopes_tenant_and_removes_index_job_and_file(
+    api_client,
+) -> None:
+    client, _, sessions, settings = api_client
+    knowledge_base_id = (
+        await client.post("/api/v1/knowledge-bases", json={"name": "Lifecycle"})
+    ).json()["id"]
+    path = f"/api/v1/knowledge-bases/{knowledge_base_id}/documents"
+    uploaded = await client.post(
+        path, files={"file": ("policy.md", b"# Policy\n", "text/markdown")}
+    )
+    document_id = uploaded.json()["id"]
+    original = settings.upload_dir / knowledge_base_id / document_id / "original.md"
+    assert original.exists()
+    async with sessions() as db:
+        stored = await db.get(Document, uuid.UUID(document_id))
+        assert stored is not None
+        stored.status = DocumentStatus.READY
+        stored.active_index_version = 1
+        db.add(
+            Chunk(
+                document_id=stored.id,
+                index_version=1,
+                chunk_index=0,
+                content="Policy",
+                token_count=1,
+                metadata_={},
+            )
+        )
+        await db.commit()
+    viewer = {
+        "Authorization": f"Bearer {make_token('viewer', tenant_id=str(uuid.uuid5(uuid.NAMESPACE_URL, 'enterprise-agent-platform:test-user')), role='viewer')}"
+    }
+    outsider = {"Authorization": f"Bearer {make_token('outsider')}"}
+    assert (
+        await client.delete(f"/api/v1/documents/{document_id}", headers=viewer)
+    ).status_code == 403
+    assert (
+        await client.delete(f"/api/v1/documents/{document_id}", headers=outsider)
+    ).status_code == 404
+    assert original.exists()
+
+    assert (await client.delete(f"/api/v1/documents/{document_id}")).status_code == 204
+    assert not original.exists()
+    assert (await client.get(f"/api/v1/documents/{document_id}")).status_code == 404
+    async with sessions() as db:
+        assert not (
+            await db.scalars(
+                select(IndexJob).where(IndexJob.document_id == uuid.UUID(document_id))
+            )
+        ).all()
+        assert not (
+            await db.scalars(
+                select(Chunk).where(Chunk.document_id == uuid.UUID(document_id))
+            )
+        ).all()
+    assert (
+        await client.post(
+            path, files={"file": ("policy.md", b"# Policy\n", "text/markdown")}
+        )
+    ).status_code == 201
 
 
 @pytest.mark.asyncio

@@ -20,7 +20,7 @@ from app.models.index_job import IndexJob
 from app.schemas.chunk import ActiveChunkRead
 from app.schemas.document import DocumentRead
 from app.schemas.index_job import IndexJobRead
-from app.services.document import upload_document
+from app.services.document import delete_document, upload_document
 from app.services.index_jobs import enqueue_reindex
 
 knowledge_base_documents_router = APIRouter(
@@ -71,6 +71,17 @@ async def get_document(
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> Document:
     return await tenant_document(db, document_id, principal)
+
+
+@documents_router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_document(
+    document_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(get_principal)],
+) -> None:
+    require_admin(principal)
+    await delete_document(db, document_id, settings, tenant_id=principal.tenant_id)
 
 
 @documents_router.post(

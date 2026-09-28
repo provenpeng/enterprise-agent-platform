@@ -10,7 +10,11 @@ from langchain_core.embeddings import Embeddings
 from app.api.answer_provider import get_answer_generator
 from app.api.diagnostic_provider import get_diagnostic_model
 from app.api.embedding_provider import get_query_embeddings
-from app.api.model_admission import ModelAdmissionGate, get_model_admission_gate
+from app.api.model_admission import (
+    ModelAdmissionGate,
+    PostgresModelAdmissionGate,
+    get_model_admission_gate,
+)
 from app.main import app
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
 
@@ -28,6 +32,28 @@ async def test_gate_times_out_and_recovers_after_failure():
             raise ValueError("caller failed")
     async with gate.slot():
         pass
+
+
+@pytest.mark.asyncio
+async def test_postgres_gate_shares_capacity_across_independent_connections(api_client):
+    _, engine, _, _ = api_client
+    database_url = engine.url.render_as_string(hide_password=False)
+    first = PostgresModelAdmissionGate(database_url, 1, 0.05)
+    second = PostgresModelAdmissionGate(database_url, 1, 0.05)
+    try:
+        with pytest.raises(ValueError):
+            async with first.slot():
+                with pytest.raises(HTTPException) as rejected:
+                    async with second.slot():
+                        pass
+                assert rejected.value.status_code == 503
+                assert rejected.value.headers == {"Retry-After": "1"}
+                raise ValueError("release on caller failure")
+        async with second.slot():
+            pass
+    finally:
+        await first.dispose()
+        await second.dispose()
 
 
 @pytest.mark.asyncio

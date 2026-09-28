@@ -7,6 +7,7 @@ export type Answer = components["schemas"]["AskResponse"];
 export type ConversationSummary = components["schemas"]["ConversationSummary"];
 export type ConversationDetail = components["schemas"]["ConversationDetail"];
 export type SearchHit = components["schemas"]["SearchHit"];
+export type ActiveChunk = components["schemas"]["ActiveChunkRead"];
 export type Identity = components["schemas"]["IdentityRead"];
 export type Tenant = components["schemas"]["TenantRead"];
 export type IndexJob = components["schemas"]["IndexJobRead"];
@@ -114,6 +115,32 @@ export async function reindexDocument(token: string, documentId: string): Promis
   });
   if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法重新索引文档"));
   return data;
+}
+
+export async function deleteDocument(token: string, documentId: string): Promise<void> {
+  const { error, response } = await api(token).DELETE("/api/v1/documents/{document_id}", {
+    params: { path: { document_id: documentId } },
+  });
+  if (!response.ok) throw new ApiError(response.status, detail(error, "无法移除文档"));
+}
+
+export async function listDocumentChunks(token: string, documentId: string, offset: number, limit = 20): Promise<ActiveChunk[]> {
+  const { data, error, response } = await api(token).GET("/api/v1/documents/{document_id}/chunks", {
+    params: { path: { document_id: documentId }, query: { offset, limit } },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "无法获取文档分片"));
+  return data;
+}
+
+export async function searchKnowledgeBase(
+  token: string, knowledgeBaseId: string, query: string, topK: number, minScore: number,
+): Promise<SearchHit[]> {
+  const { data, error, response } = await api(token).POST("/api/v1/knowledge-bases/{knowledge_base_id}/search", {
+    params: { path: { knowledge_base_id: knowledgeBaseId } },
+    body: { query, top_k: topK, min_score: minScore },
+  });
+  if (!response.ok || !data) throw new ApiError(response.status, detail(error, "检索失败"));
+  return data.hits;
 }
 
 export async function diagnoseOrder(

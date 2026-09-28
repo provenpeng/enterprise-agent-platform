@@ -113,6 +113,39 @@ def _remove_original(destination: Path) -> None:
             break
 
 
+async def delete_document(
+    db: AsyncSession,
+    document_id: uuid.UUID,
+    settings: Settings,
+    *,
+    tenant_id: uuid.UUID,
+) -> None:
+    """Remove a tenant document and jobs first, then clean up its original file."""
+    document = await db.scalar(
+        select(Document)
+        .join(KnowledgeBase)
+        .where(
+            Document.id == document_id,
+            KnowledgeBase.tenant_id == tenant_id,
+        )
+        .with_for_update(of=Document)
+    )
+    if document is None:
+        await db.rollback()
+        raise NotFound("Document not found")
+    root = settings.upload_dir.resolve()
+    destination = (root / document.storage_uri).resolve()
+    if not destination.is_relative_to(root):
+        await db.rollback()
+        raise InvalidInput("Invalid stored document path")
+    await db.delete(document)
+    await db.commit()
+    try:
+        await asyncio.to_thread(_remove_original, destination)
+    except OSError:
+        logger.exception("Could not remove deleted document file: %s", destination)
+
+
 async def upload_document(
     db: AsyncSession,
     knowledge_base_id: uuid.UUID,

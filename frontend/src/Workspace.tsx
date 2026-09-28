@@ -11,6 +11,7 @@ import { AnswerPanel } from "./components/AnswerPanel";
 import { DocumentsPanel } from "./components/DocumentsPanel";
 import { DiagnosticPanel } from "./components/DiagnosticPanel";
 import { AgentRunsPanel } from "./components/AgentRunsPanel";
+import { SearchPanel } from "./components/SearchPanel";
 
 const PAGE_SIZE = 20;
 
@@ -149,6 +150,7 @@ function Console({ token, name, signOut }: { token: string; name: string; signOu
                       destroyOnHidden
                       items={[
                         { key: "answers", label: "引用问答", children: <AnswerPanel key={`answer-${selectedId}`} token={token} knowledgeBaseId={selectedId} /> },
+                        { key: "search", label: "检索调试", children: <SearchPanel key={`search-${selectedId}`} token={token} knowledgeBaseId={selectedId} /> },
                         { key: "diagnostic", label: "订单诊断", children: <DiagnosticPanel key={`diagnostic-${selectedId}`} token={token} knowledgeBaseId={selectedId} canViewTrace={canWrite} onOpenRun={(runId) => { setSelectedRunId(runId); setActiveTab("runs"); }} /> },
                         ...(canWrite ? [{ key: "runs", label: "运行轨迹", children: <AgentRunsPanel token={token} selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} /> }] : []),
                       ]}

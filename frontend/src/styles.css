@@ -71,6 +71,7 @@ button, input, textarea { font: inherit; }
 .workspace-tabs .workspace-card > .ant-card-head { padding: 0; }
 .workspace-tabs .workspace-card > .ant-card-body { padding: 18px 0 0; }
 .diagnostic-form { display: grid; gap: 8px; }
+.search-form { display: grid; gap: 12px; margin-bottom: 20px; }
 .diagnostic-form .field-label:not(:first-child) { margin-top: 10px; }
 .diagnostic-form .ant-btn { justify-self: start; margin-top: 18px; }
 .diagnostic-order { margin-top: 26px; }

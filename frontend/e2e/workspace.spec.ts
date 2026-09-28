@@ -43,6 +43,9 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
     if (method === "GET" && path === "/api/v1/knowledge-bases") return json([{ id: kb, tenant_id: kb, name: "综合业务知识库", description: "多业务政策", created_at: now }]);
     if (path === `/api/v1/knowledge-bases/${kb}/documents` && method === "GET") return json(uploaded ? [{ id: doc, knowledge_base_id: kb, filename: "expense_policy.md", file_type: "text/markdown", status: "READY", active_index_version: 1, checksum: "fixture", created_at: now }] : []);
     if (path === `/api/v1/knowledge-bases/${kb}/documents` && method === "POST") { uploaded = true; return json({ id: doc, filename: "expense_policy.md" }, 201); }
+    if (path === `/api/v1/documents/${doc}/chunks` && method === "GET") return json([{ id: source.chunk_id, index_version: 1, chunk_index: 0, content: source.content, token_count: 29, page_number: null, section_title: source.section_title, section_path: source.section_path }]);
+    if (path === `/api/v1/documents/${doc}` && method === "DELETE") { uploaded = false; return route.fulfill({ status: 204, body: "" }); }
+    if (path === `/api/v1/knowledge-bases/${kb}/search` && method === "POST") return json({ knowledge_base_id: kb, hits: [source] });
     if (path === `/api/v1/agent-runs/mine` && method === "GET") return json(diagnosed ? [{ id: run, question: "DEMO-SUCCESS 的退款状态？", outcome: "BUSINESS_FACTS_ONLY", started_at: now }] : []);
     if (path === `/api/v1/agent-runs/mine/${run}` && method === "GET") return json({ id: run, question: "DEMO-SUCCESS 的退款状态？", outcome: "BUSINESS_FACTS_ONLY", started_at: now, response: diagnosis });
     if (path === "/api/v1/agent-runs" && method === "GET") return json([]);
@@ -68,6 +71,14 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
   await page.locator("input[type=file]").setInputFiles("../examples/expense_policy.md");
   await page.getByRole("button", { name: "上传并索引" }).click();
   await expect(page.getByText("可检索")).toBeVisible();
+  await page.getByRole("button", { name: "分片" }).click();
+  await expect(page.getByText("分片 1")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "检索调试" }).click();
+  await page.getByLabel("检索问题").fill("出差报销的提交期限？");
+  await page.getByRole("button", { name: "检索" }).click();
+  await expect(page.getByText("向量分数 0.910")).toBeVisible();
+  await page.getByRole("tab", { name: "引用问答" }).click();
   await page.getByLabel("向当前知识库提问").fill("出差报销的提交期限？");
   await page.getByRole("button", { name: "获取回答" }).click();
   await expect(page.getByText("出差结束后 30 个自然日内提交。", { exact: false }).first()).toBeVisible();
@@ -84,4 +95,7 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
   await page.getByRole("tab", { name: "订单诊断" }).click();
   await page.getByRole("button", { name: "恢复结果" }).click();
   await expect(page.getByText("订单 DEMO-SUCCESS 最近一次退款状态为 SUCCEEDED。")).toBeVisible();
+  await page.getByRole("button", { name: "移除" }).first().click();
+  await page.getByRole("button", { name: /移\s*除/ }).last().click();
+  await expect(page.getByText("暂无文档")).toBeVisible();
 });

@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.jwks import JwksUnavailable, jwks_resolver
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.models.document import Document
@@ -50,12 +51,32 @@ async def get_principal(
 ) -> Principal:
     if credentials is None:
         raise _unauthorized()
-    try:
-        key = _public_key(settings.auth_public_key_path)
-    except OSError as exc:
-        raise HTTPException(
-            status_code=503, detail="Authentication is not configured"
-        ) from exc
+    if settings.auth_jwks_url:
+        try:
+            header = jwt.get_unverified_header(credentials.credentials)
+            kid = header.get("kid")
+            if (
+                header.get("alg") != "RS256"
+                or not isinstance(kid, str)
+                or not 1 <= len(kid) <= 128
+            ):
+                raise _unauthorized()
+            key = await jwks_resolver.key(str(settings.auth_jwks_url), kid)
+        except jwt.PyJWTError as exc:
+            raise _unauthorized() from exc
+        except JwksUnavailable as exc:
+            raise HTTPException(
+                status_code=503, detail="Identity provider keys are unavailable"
+            ) from exc
+        if key is None:
+            raise _unauthorized()
+    else:
+        try:
+            key = _public_key(settings.auth_public_key_path)
+        except OSError as exc:
+            raise HTTPException(
+                status_code=503, detail="Authentication is not configured"
+            ) from exc
     try:
         claims = jwt.decode(
             credentials.credentials,

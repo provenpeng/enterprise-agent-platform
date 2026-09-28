@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.model import DiagnosticModel
 from app.agent.trace import RunRecorder
-from app.business.orders import OrderLookupTool
+from app.business.orders import OrderReader, OrderServiceUnavailable
 from app.schemas.business import OrderSnapshot
 from app.schemas.diagnostic import DiagnoseResponse
 from app.schemas.retrieval import SearchHit
@@ -95,12 +95,14 @@ class DiagnosticWorkflow:
         model: DiagnosticModel,
         recorder: RunRecorder,
         options: DiagnosticOptions,
+        order_reader: OrderReader,
     ) -> None:
         self._db = db
         self._embeddings = embeddings
         self._model = model
         self._recorder = recorder
         self._options = options
+        self._order_reader = order_reader
 
     async def _plan(self, state: DiagnosticState) -> DiagnosticState:
         async with self._recorder.step(
@@ -137,10 +139,8 @@ class DiagnosticWorkflow:
             "lookup_order", {"order_id": state["order_id"]}
         ) as trace:
             try:
-                order = await OrderLookupTool(self._db, self._options.tenant_id).lookup(
-                    state["order_id"]
-                )
-            except SQLAlchemyError as exc:
+                order = await self._order_reader.lookup(state["order_id"])
+            except (SQLAlchemyError, OrderServiceUnavailable) as exc:
                 logger.warning("Diagnostic order lookup failed", exc_info=True)
                 raise UpstreamUnavailable("Order lookup is unavailable") from exc
             if order is None:

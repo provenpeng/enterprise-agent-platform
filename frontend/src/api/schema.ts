@@ -227,6 +227,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-runs/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List My Diagnostics */
+        get: operations["list_my_diagnostics_api_v1_agent_runs_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-runs/mine/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get My Diagnostic */
+        get: operations["get_my_diagnostic_api_v1_agent_runs_mine__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-runs": {
         parameters: {
             query?: never;
@@ -392,6 +426,7 @@ export interface components {
             started_at: string;
             /** Finished At */
             finished_at: string | null;
+            response_data: components["schemas"]["DiagnoseResponse"] | null;
             /** Steps */
             steps: components["schemas"]["AgentRunStepRead"][];
         };
@@ -611,6 +646,41 @@ export interface components {
             order: components["schemas"]["OrderSnapshot"] | null;
             /** Citations */
             citations: components["schemas"]["AnswerCitation"][];
+        };
+        /** DiagnosticHistoryDetail */
+        DiagnosticHistoryDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Question */
+            question: string;
+            /** Outcome */
+            outcome: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            response: components["schemas"]["DiagnoseResponse"];
+        };
+        /** DiagnosticHistorySummary */
+        DiagnosticHistorySummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Question */
+            question: string;
+            /** Outcome */
+            outcome: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
         };
         /** DocumentRead */
         DocumentRead: {
@@ -1352,6 +1422,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiagnoseResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_diagnostics_api_v1_agent_runs_mine_get: {
+        parameters: {
+            query: {
+                knowledge_base_id: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticHistorySummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_diagnostic_api_v1_agent_runs_mine__run_id__get: {
+        parameters: {
+            query: {
+                knowledge_base_id: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticHistoryDetail"];
                 };
             };
             /** @description Validation Error */

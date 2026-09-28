@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import aclosing
@@ -18,6 +19,12 @@ from app.services.retrieval import search_knowledge_base
 
 logger = logging.getLogger(__name__)
 NO_ANSWER = "根据当前知识库资料，无法确定答案。"
+_ABSTENTION_PHRASING = re.compile(
+    r"(提供的证据中没有|证据(?:仅|中).*未(?:提及|说明)|"
+    r"知识库(?:资料)?(?:中)?(?:没有|未提及|未说明)|"
+    r"(?:无法|不能)(?:从|根据|依据).{0,18}(?:证据|资料).{0,12}(?:确定|回答)|"
+    r"(?:无法确定|未提及).{0,12}(?:答案|标准|期限|金额))"
+)
 
 
 def _abstention(knowledge_base_id: uuid.UUID) -> AskResponse:
@@ -32,6 +39,11 @@ def _abstention(knowledge_base_id: uuid.UUID) -> AskResponse:
 def _response_for_draft(
     knowledge_base_id: uuid.UUID, draft: AnswerDraft, hits: list[SearchHit]
 ) -> AskResponse:
+    # A model sometimes cites an adjacent policy while explicitly saying the
+    # requested fact is absent. Such a citation must never become a grounded
+    # answer, including on the streaming final event.
+    if _ABSTENTION_PHRASING.search(draft.answer):
+        return _abstention(knowledge_base_id)
     cited = attach_verified_citations(draft.answer, draft.cited_chunk_ids, hits)
     if cited is None:
         logger.info(
@@ -45,6 +57,23 @@ def _response_for_draft(
         grounded=True,
         citations=citations,
     )
+
+
+def _diversify_hits(hits: list[SearchHit], limit: int) -> list[SearchHit]:
+    """Keep multiple documents visible when one policy dominates the ranking."""
+    per_document: dict[uuid.UUID, int] = {}
+    selected: list[SearchHit] = []
+    deferred: list[SearchHit] = []
+    for hit in hits:
+        count = per_document.get(hit.document_id, 0)
+        if count >= 4:
+            deferred.append(hit)
+            continue
+        selected.append(hit)
+        per_document[hit.document_id] = count + 1
+        if len(selected) == limit:
+            return selected
+    return (selected + deferred)[:limit]
 
 
 async def retrieve_answer_hits(
@@ -66,14 +95,14 @@ async def retrieve_answer_hits(
         knowledge_base_id=knowledge_base_id,
         embedding_space_id=embedding_space_id,
         query=question,
-        top_k=top_k,
+        top_k=min(20, top_k * 2),
         min_score=min_score,
         timeout_seconds=embedding_timeout_seconds,
     )
     # Search results are DTOs; no database transaction is needed while the
     # answer model runs, and the source IDs were already tenant scoped.
     await db.rollback()
-    return hits
+    return _diversify_hits(hits, top_k)
 
 
 async def answer_question(

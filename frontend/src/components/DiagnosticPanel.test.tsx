@@ -1,14 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { diagnoseOrder } from "../api/client";
+import { diagnoseOrder, getMyDiagnosis, listMyDiagnoses } from "../api/client";
 import { DiagnosticPanel } from "./DiagnosticPanel";
 
 vi.mock("../api/client", async (importOriginal) => ({
   ...await importOriginal<typeof import("../api/client")>(),
   diagnoseOrder: vi.fn(),
+  getMyDiagnosis: vi.fn(),
+  listMyDiagnoses: vi.fn(),
 }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
+vi.mocked(listMyDiagnoses).mockResolvedValue([]);
+vi.mocked(getMyDiagnosis).mockRejectedValue(new Error("No fixture"));
 
 function renderPanel(canViewTrace: boolean, onOpenRun = vi.fn()) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

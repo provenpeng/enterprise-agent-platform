@@ -1,0 +1,671 @@
+{
+  "dataset_version": "synthetic-enterprise-general-sealed-v4",
+  "dataset_sha256": "c1a63396ac356acaf149ed47e63db07d7769e9a765003ca133796a95ea4c5bd1",
+  "generated_at": "2026-09-27T13:56:30.011523+00:00",
+  "expected_model_config": {
+    "source": "runner_environment",
+    "embedding_model": "nomic-embed-text",
+    "embedding_native_dimensions": 768,
+    "embedding_revision": "default",
+    "embedding_provider_id": "local-ollama-nomic",
+    "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558",
+    "answer_model": "deepseek-chat",
+    "chat_structured_output_method": "json_mode"
+  },
+  "indexes": [
+    {
+      "filename": "access_control.md",
+      "checksum": "d9f7c82542554cd9db102dd7bda77e3464cd2ad3d48594c86d38ac6b1641ad7f",
+      "index_version": 1,
+      "processing_backend": "manual",
+      "processing_version": "1",
+      "embedding_model": "nomic-embed-text",
+      "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558"
+    },
+    {
+      "filename": "expense_policy.md",
+      "checksum": "4223a1d6084077b2232aaa0fa625944e5136d6f0b8e3706dcbb78acd3f0377c0",
+      "index_version": 1,
+      "processing_backend": "manual",
+      "processing_version": "1",
+      "embedding_model": "nomic-embed-text",
+      "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558"
+    },
+    {
+      "filename": "incident_response.md",
+      "checksum": "9ffda20d4eb2caf951b4d8094252f9ca35efc8bd6eba79a69b893d60df78a4d8",
+      "index_version": 1,
+      "processing_backend": "manual",
+      "processing_version": "1",
+      "embedding_model": "nomic-embed-text",
+      "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558"
+    },
+    {
+      "filename": "procurement_policy.md",
+      "checksum": "b3779a2ae587fff453ed415b8367a8ae51d8a0dd45423416481820ae2422417f",
+      "index_version": 1,
+      "processing_backend": "manual",
+      "processing_version": "1",
+      "embedding_model": "nomic-embed-text",
+      "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558"
+    },
+    {
+      "filename": "refund_policy.md",
+      "checksum": "ddc4c2e8191980bac9d0000cf860982146041941d7633e9f6b540454c1d63fe8",
+      "index_version": 1,
+      "processing_backend": "manual",
+      "processing_version": "1",
+      "embedding_model": "nomic-embed-text",
+      "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558"
+    },
+    {
+      "filename": "returns_policy.md",
+      "checksum": "fac77aadcb6ea09359162ed0a78d03ef76f2437ce561ede8430ebdeef7a827b4",
+      "index_version": 1,
+      "processing_backend": "manual",
+      "processing_version": "1",
+      "embedding_model": "nomic-embed-text",
+      "embedding_space_id": "2259f39ee5350eb4d8b70863d1c73a693d94a2a9d9a132e8a7837b7717b9b558"
+    }
+  ],
+  "case_counts": {
+    "retrieval_positive": 17,
+    "retrieval_no_answer": 3,
+    "qa_positive": 15,
+    "qa_abstention": 3,
+    "diagnostic": 4,
+    "authorization": 3
+  },
+  "metrics": {
+    "retrieval_recall_at_1": 0.9411764705882353,
+    "retrieval_recall_at_5": 1.0,
+    "retrieval_mrr_at_5": 0.9705882352941176,
+    "retrieval_no_hit_rate": 1.0,
+    "qa_citation_source_accuracy": 1.0,
+    "qa_abstention_accuracy": 1.0,
+    "diagnostic_order_lookup_accuracy": 1.0,
+    "diagnostic_reason_code_accuracy": 1.0,
+    "diagnostic_policy_route_accuracy": 1.0,
+    "diagnostic_status_accuracy": 1.0,
+    "diagnostic_citation_source_accuracy": 1.0,
+    "tenant_isolation_accuracy": 1.0
+  },
+  "quality_gate": {
+    "min_score": 0,
+    "thresholds": {
+      "retrieval_recall_at_1": 0.7,
+      "retrieval_recall_at_5": 0.9,
+      "retrieval_mrr_at_5": 0.75,
+      "retrieval_no_hit_rate": 1.0,
+      "qa_citation_source_accuracy": 0.9,
+      "qa_abstention_accuracy": 1.0,
+      "diagnostic_order_lookup_accuracy": 1.0,
+      "diagnostic_reason_code_accuracy": 1.0,
+      "diagnostic_policy_route_accuracy": 1.0,
+      "diagnostic_status_accuracy": 1.0,
+      "diagnostic_citation_source_accuracy": 1.0,
+      "tenant_isolation_accuracy": 1.0
+    },
+    "below_threshold": [],
+    "mandatory_failures": [],
+    "passed": true,
+    "profile": {
+      "name": "synthetic-enterprise-general-sealed-gate-v4",
+      "dataset_version": "synthetic-enterprise-general-sealed-v4",
+      "sha256": "f2f7da646422e4bb6bbd18e01f46429d56f6dc5b2596c26420a15b85c9cd4214"
+    }
+  },
+  "retrieval_cases": [
+    {
+      "id": "seal_r01",
+      "category": "direct",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r02",
+      "category": "confusable",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r03",
+      "category": "paraphrase",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r04",
+      "category": "direct",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r05",
+      "category": "confusable",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r06",
+      "category": "paraphrase",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r07",
+      "category": "direct",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r08",
+      "category": "paraphrase",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r09",
+      "category": "direct",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r10",
+      "category": "confusable",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r11",
+      "category": "paraphrase",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r12",
+      "category": "direct",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r13",
+      "category": "confusable",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r14",
+      "category": "paraphrase",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r15",
+      "category": "direct",
+      "expect_no_hits": false,
+      "rank": 2,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r16",
+      "category": "confusable",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r17",
+      "category": "paraphrase",
+      "expect_no_hits": false,
+      "rank": 1,
+      "no_hits": false,
+      "error": null
+    },
+    {
+      "id": "seal_r18",
+      "category": "no_answer",
+      "expect_no_hits": true,
+      "rank": null,
+      "no_hits": true,
+      "error": null
+    },
+    {
+      "id": "seal_r19",
+      "category": "no_answer",
+      "expect_no_hits": true,
+      "rank": null,
+      "no_hits": true,
+      "error": null
+    },
+    {
+      "id": "seal_r20",
+      "category": "no_answer",
+      "expect_no_hits": true,
+      "rank": null,
+      "no_hits": true,
+      "error": null
+    }
+  ],
+  "qa_cases": [
+    {
+      "id": "seal_q01",
+      "query": "一笔订单已经全额成功退款，客户还能再申请同一订单的退款吗？",
+      "answer": "不能。已全额成功退款的订单不能重复退款。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "refund_exclusion",
+          "document_name": "refund_policy.md",
+          "section_path": [
+            "客户退款与资金处理作业规范",
+            "不可退款与例外"
+          ],
+          "content": "标记为最终销售且在展示页与订单确认页明确告知的商品，按合同约定处理；已全额成功退款的订单不能重复退款。对未交付、错发、质量争议等场景，不应仅凭“最终销售”标记拒绝，须移交客服主管和法务核对强制性规定及合同条款。任何例外都要记录审批人、依据、金额、时间和客户通知结果，不能只在聊天记录中留痕。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q02",
+      "query": "客户在支付后 30 天内被系统受理，内部审批跨过第 30 天会自动失效吗？",
+      "answer": "不会。若客户在期限内提交且系统受理，后续材料补齐或内部审批跨过第 30 天，不因此自动撤销该申请。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "refund_window",
+          "document_name": "refund_policy.md",
+          "section_path": [
+            "客户退款与资金处理作业规范",
+            "申请资格与时限"
+          ],
+          "content": "客户可在订单实际支付成功后 30 个自然日内提交退款申请。计时起点以支付流水的成功时间为准，不是下单时间、发货时间或客户首次联系时间。客服应记录订单号、申请人、申请金额、原因和原支付流水；缺少支付流水时先发起核查，不承诺可以退款。商品退货的签收期限另见《商品退货与换货作业规范》，不能把签收时间当作资金退款申请的起点。\n\n若客户在期限内提交且系统受理，后续材料补齐或内部审批跨过第 30 天，不因此自动撤销该申请。客户撤回后重新提交的，按新申请时间重新校验。法定权利或已签署合同有更高优先级时，由法务确认具体依据并记录例外审批，客服不得自行口头延长期限。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q03",
+      "query": "支付机构退款响应超时，能否直接发送第二笔同额指令？",
+      "answer": "不能。支付机构未在规定响应窗口内返回最终处理结果时，状态未知而非确定失败；应先查询渠道交易号和最终状态，在确认原指令失败或撤销前，不得发送同金额第二笔指令，以避免重复退款。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "refund_gateway_error",
+          "document_name": "refund_policy.md",
+          "section_path": [
+            "客户退款与资金处理作业规范",
+            "异常原因代码与处置",
+            "GATEWAY_TIMEOUT"
+          ],
+          "content": "支付机构未在规定响应窗口内返回最终处理结果，此时状态未知而非确定失败。支付运营应先查询渠道交易号和最终状态，再决定是否重试；在确认原指令失败或撤销前，不得发送同金额第二笔指令，以避免重复退款。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q04",
+      "query": "门店自提商品的普通退货 14 天以哪个交付记录为准？",
+      "answer": "门店自提订单的普通退货 14 天以门店交付确认时间为准。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "return_window",
+          "document_name": "returns_policy.md",
+          "section_path": [
+            "商品退货与换货作业规范",
+            "退货申请期限"
+          ],
+          "content": "客户应在物流签收次日起 14 个自然日内发起普通退货申请，以承运商有效签收记录为准。自提订单以门店交付确认时间为准；代收点签收后的争议由售后核对承运商证明。支付日期和开票日期都不是这 14 天的起点。商品质量缺陷、错发漏发或法律另有规定时，普通期限不直接决定客户权利，由售后主管按质检结果和法务意见处理。\n\n申请提交后，客服在 1 个工作日内给出受理编号和寄回指引。客户在取得指引后应在 7 个自然日内交寄，无法按时寄回可说明原因并申请延期。是否批准延期须写入工单，客服不能只在电话中承诺。已寄回但物流长期停滞的商品先走异常物流核查，不因物流延迟直接拒绝原本及时提交的申请。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q05",
+      "query": "退货序列号与订单不符时，仓库和售后主管各负责什么？",
+      "answer": "仓库负责在收到退货后2个工作日内记录外包装、序列号、配件、使用痕迹和照片，并在工单上传验收结论，仅提供事实记录，不对客户是否符合合同退货条件作最终决定；售后主管依据验收和订单展示信息作出批准、补件或拒绝决定，并记录具体条款。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "return_inspection",
+          "document_name": "returns_policy.md",
+          "section_path": [
+            "商品退货与换货作业规范",
+            "商品验收"
+          ],
+          "content": "仓库收到退货后应在 2 个工作日内记录外包装、序列号、配件、使用痕迹和照片，并在工单上传验收结论。质量问题由质检组复核；争议商品不得直接入可售库存。仓库仅提供事实记录，不对客户是否符合合同上的退货条件作最终决定。售后主管依据验收和订单展示信息作出批准、补件或拒绝决定，并记录具体条款。\n\n对于缺少配件、序列号不符或超出普通期限的情况，客服应向客户说明可补充材料及复核渠道。涉及个人数据的设备应先完成授权擦除或隔离；未经处理的设备不能直接转售。验收照片只用于本次售后目的，按数据保留规范控制访问。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q06",
+      "query": "纸质发票遗失后，员工需要补充哪些材料和审批？",
+      "answer": "纸质发票遗失时，员工需提交遗失说明、支付流水及第三方补开证明，由财务经理按例外流程审批。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "expense_invoice",
+          "document_name": "expense_policy.md",
+          "section_path": [
+            "员工差旅与费用报销管理办法",
+            "票据与附件"
+          ],
+          "content": "每笔费用应附合法有效的电子或纸质发票、支付证明以及能说明业务目的的行程或会议记录。电子发票需上传原文件，截图不能替代可验证发票；纸质票据应保证抬头、税号、日期、金额和项目完整。发票遗失时，员工提交遗失说明、支付流水及第三方补开证明，由财务经理按例外流程审批，不能把无发票支出直接列为合规税前票据。\n\n财务系统会检查发票号码、金额和销售方重复；同一张票据不得在不同项目或员工名下重复报销。外币费用按公司月度汇率表折算，报销单保留原币金额、币种和折算汇率。机票退改签费用需附原行程、改签原因和承运商凭证。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q07",
+      "query": "单笔报销超过一万元需要谁加签，这会替代直属主管审批吗？",
+      "answer": "单笔报销超过人民币 10,000 元需部门负责人加签；该加签不改变员工直属主管的基本审批责任，因此不替代直属主管审批。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "expense_approval",
+          "document_name": "expense_policy.md",
+          "section_path": [
+            "员工差旅与费用报销管理办法",
+            "标准与审批责任"
+          ],
+          "content": "国内普通城市住宿上限为每晚人民币 500 元，一线城市上限为每晚人民币 700 元；超标部分原则上由个人承担。项目合同要求指定酒店或会务统一安排的，员工须事前取得预算负责人书面批准并在报销单关联项目。餐补按出差自然日计算，已由客户或会议主办方提供餐食的日期应扣减对应餐补，不能同时全额领取。\n\n直属主管是差旅费业务批准人，预算负责人确认项目额度，财务共享中心校验票据并执行付款。单笔报销超过人民币 10,000 元需部门负责人加签；这一加签不改变员工直属主管的基本审批责任。付款账户必须为员工实名工资卡，第三方账户须由人力资源和财务共同审核特殊原因。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q08",
+      "query": "供应商邮件要求更换收款账户时，财务可否仅凭邮件附件变更？",
+      "answer": "不可以。供应商要求临时更改收款账户时，必须通过合同留存联系人和财务独立回拨核实，不能只依据邮件附件修改。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "procurement_payment",
+          "document_name": "procurement_policy.md",
+          "section_path": [
+            "供应商准入与采购合同管理规程",
+            "验收与付款"
+          ],
+          "content": "业务部门依据合同验收标准记录交付结果；软件服务需提供开通清单和权限范围，实体货物需核对数量与质量。财务收到合同、验收单和有效发票三项匹配材料后安排付款。预付款依合同里程碑执行并在台账中追踪未交付余额。供应商要求临时更改收款账户时，必须通过合同留存联系人和财务独立回拨核实，不能只依据邮件附件修改。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q09",
+      "query": "单一来源采购须说明什么，并由谁联合批准？",
+      "answer": "单一来源采购需说明技术兼容或独占依据，并由采购负责人、预算负责人及合规负责人联合批准。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "procurement_exception",
+          "document_name": "procurement_policy.md",
+          "section_path": [
+            "供应商准入与采购合同管理规程",
+            "例外、终止与归档"
+          ],
+          "content": "单一来源采购需说明技术兼容或独占依据，经采购负责人、预算负责人及合规负责人联合批准。出现重大交付违约或安全事件时，业务部门立即暂停新增交付并通知采购、法务和安全团队评估终止。准入材料、报价、审批、合同、验收和付款凭证至少保存 7 年；包含个人信息的附件按数据分类要求限制访问，到期按档案流程销毁。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q10",
+      "query": "远程接入和财务系统的登录是否必须多因素认证？",
+      "answer": "是。生产环境管理后台、远程接入和财务系统必须启用多因素认证。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "access_mfa",
+          "document_name": "access_control.md",
+          "section_path": [
+            "员工与第三方访问控制规范",
+            "多因素认证与会话"
+          ],
+          "content": "生产环境管理后台、远程接入和财务系统必须启用多因素认证。新设备登录触发风险校验；服务台不得应电话请求直接移除多因素认证。用户丢失认证设备时，通过人事信息和第二独立渠道核实身份后重置，并通知本人。单点登录访问令牌的具体有效期由身份平台配置基线管理，本规范不承诺固定小时数；查询时应以当前配置记录为准。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q11",
+      "query": "第三方紧急故障处理的临时权限最久多久，事后复核期限是多少？",
+      "answer": "第三方紧急故障处理的临时权限最长 8 小时，事后 1 个工作日内由系统所有者复核操作日志和原因。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "access_vendor",
+          "document_name": "access_control.md",
+          "section_path": [
+            "员工与第三方访问控制规范",
+            "第三方与临时访问"
+          ],
+          "content": "第三方人员只能在有效合同与保密承诺范围内访问指定系统，需由内部担保人提出申请并明确结束日期。接入生产环境应使用受控跳板和会话记录，原则上不授予持久本地管理员权限。紧急故障处理可启用临时权限，最长 8 小时，事后 1 个工作日内由系统所有者复核操作日志和原因。供应商资质通过只是采购准入条件，不自动授予系统账号。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q12",
+      "query": "发现大量敏感数据泄露时如何分级，能为了指标降为观察中吗？",
+      "answer": "已确认大量敏感数据泄露属于一级事件。初始分级可随证据变化调整，但必须记录变更原因和决定人；不能为了满足内部响应指标把已确认影响降为“观察中”。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "incident_level",
+          "document_name": "incident_response.md",
+          "section_path": [
+            "安全事件分级与通报手册",
+            "分级标准"
+          ],
+          "content": "一级事件指已确认大量敏感数据泄露、核心交易长期中断或跨多个生产区域的控制权丢失；二级事件指有限范围的敏感数据暴露、单一关键系统被入侵或较大范围服务中断；三级事件指可控的异常访问尝试、单一设备恶意软件或尚未确认影响的数据风险。初始分级允许随证据变化调整，必须记录变更原因和决定人。不能为了满足内部响应指标把已确认影响降为“观察中”。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q13",
+      "query": "向客户初次说明安全事件时，已确认事实和在查事项应如何区分？",
+      "answer": "对客户的初次说明应区分已确认事实、尚在核查事项、已采取的保护措施和下一次更新时间，且不推测攻击者身份。\n\n来源：[1]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "incident_notice",
+          "document_name": "incident_response.md",
+          "section_path": [
+            "安全事件分级与通报手册",
+            "外部通报与客户沟通"
+          ],
+          "content": "法务依据事件事实、受影响数据类型、地域和合同条款决定通知对象与期限。对客户的初次说明应区分已确认事实、尚在核查事项、已采取的保护措施和下一次更新时间，不推测攻击者身份。业务负责人不得为了提前结案承诺“没有数据泄露”，除非取证证据支持。涉及支付争议的客户工单应转财务与客服协同处理，安全事件记录不代替退款审批。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q14",
+      "query": "客户退款审批通过与员工报销审批完成后，企业分别多久提交处理指令或付款批次？",
+      "answer": "客户退款审批通过后，财务共享中心通常在 3 个工作日内向原支付渠道提交退款指令；员工报销材料完整且审批结束后，财务共享中心通常在 5 个工作日内完成付款批次提交。\n\n来源：[1] [2]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "refund_approval",
+          "document_name": "refund_policy.md",
+          "section_path": [
+            "客户退款与资金处理作业规范",
+            "审批与处理时限"
+          ],
+          "content": "客服收齐原支付凭证、申请原因及必要的退货验收结果后，在工单中提交运营主管审核。运营主管负责最终业务资格审批，财务共享中心只校验资金信息并执行已批准的退款；客服和财务人员不能代替运营主管批准业务例外。超过人民币 5,000 元或涉及批量退款的申请，还需财务经理复核，复核不代替运营主管的资格判断。\n\n审批通过后，财务共享中心通常在 3 个工作日内向原支付渠道提交退款指令。此时间指企业提交处理指令，不等于客户银行卡或支付账户实际到账时间。客服对外沟通时应区分“已批准”“已提交渠道”和“渠道已确认成功”。周末和法定节假日不计入工作日；渠道到账延迟应凭支付机构流水跟进。"
+        },
+        {
+          "source_id": "expense_payment",
+          "document_name": "expense_policy.md",
+          "section_path": [
+            "员工差旅与费用报销管理办法",
+            "支付、退回与申诉"
+          ],
+          "content": "材料完整且审批结束后，财务共享中心通常在 5 个工作日内完成付款批次提交。财务退回报销单时，应给出具体缺失项和补正截止时间；员工补齐后沿用原单据编号。对费用标准有争议的，员工可在收到退回通知后 10 个工作日内向财务经理提交复核，经理需记录依据和最终决定。不得通过拆单规避审批级别。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q15",
+      "query": "普通实物退货与资金退款的期限分别从哪个事件开始？",
+      "answer": "普通实物退货的期限从物流签收次日起算（自提订单以门店交付确认时间为准）；资金退款的期限从订单实际支付成功、以支付流水成功时间为起算点。\n\n来源：[1] [2]",
+      "citation_source": true,
+      "abstained": false,
+      "cited_evidence": [
+        {
+          "source_id": "return_window",
+          "document_name": "returns_policy.md",
+          "section_path": [
+            "商品退货与换货作业规范",
+            "退货申请期限"
+          ],
+          "content": "客户应在物流签收次日起 14 个自然日内发起普通退货申请，以承运商有效签收记录为准。自提订单以门店交付确认时间为准；代收点签收后的争议由售后核对承运商证明。支付日期和开票日期都不是这 14 天的起点。商品质量缺陷、错发漏发或法律另有规定时，普通期限不直接决定客户权利，由售后主管按质检结果和法务意见处理。\n\n申请提交后，客服在 1 个工作日内给出受理编号和寄回指引。客户在取得指引后应在 7 个自然日内交寄，无法按时寄回可说明原因并申请延期。是否批准延期须写入工单，客服不能只在电话中承诺。已寄回但物流长期停滞的商品先走异常物流核查，不因物流延迟直接拒绝原本及时提交的申请。"
+        },
+        {
+          "source_id": "refund_window",
+          "document_name": "refund_policy.md",
+          "section_path": [
+            "客户退款与资金处理作业规范",
+            "申请资格与时限"
+          ],
+          "content": "客户可在订单实际支付成功后 30 个自然日内提交退款申请。计时起点以支付流水的成功时间为准，不是下单时间、发货时间或客户首次联系时间。客服应记录订单号、申请人、申请金额、原因和原支付流水；缺少支付流水时先发起核查，不承诺可以退款。商品退货的签收期限另见《商品退货与换货作业规范》，不能把签收时间当作资金退款申请的起点。\n\n若客户在期限内提交且系统受理，后续材料补齐或内部审批跨过第 30 天，不因此自动撤销该申请。客户撤回后重新提交的，按新申请时间重新校验。法定权利或已签署合同有更高优先级时，由法务确认具体依据并记录例外审批，客服不得自行口头延长期限。"
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "seal_q16",
+      "query": "员工今年年终奖保证发几个月？",
+      "answer": "根据当前知识库资料，无法确定答案。",
+      "citation_source": false,
+      "abstained": true,
+      "cited_evidence": [],
+      "error": null
+    },
+    {
+      "id": "seal_q17",
+      "query": "通勤班车末班车几点出发？",
+      "answer": "根据当前知识库资料，无法确定答案。",
+      "citation_source": false,
+      "abstained": true,
+      "cited_evidence": [],
+      "error": null
+    },
+    {
+      "id": "seal_q18",
+      "query": "公司的会议室预订入口是什么网址？",
+      "answer": "根据当前知识库资料，无法确定答案。",
+      "citation_source": false,
+      "abstained": true,
+      "cited_evidence": [],
+      "error": null
+    }
+  ],
+  "diagnostic_cases": [
+    {
+      "id": "seal_d1",
+      "order_lookup": true,
+      "reason_code": true,
+      "policy_route": true,
+      "status": true,
+      "citation_source": true,
+      "error": null
+    },
+    {
+      "id": "seal_d2",
+      "order_lookup": true,
+      "reason_code": true,
+      "policy_route": true,
+      "status": true,
+      "citation_source": true,
+      "error": null
+    },
+    {
+      "id": "seal_d3",
+      "order_lookup": true,
+      "reason_code": true,
+      "policy_route": true,
+      "status": true,
+      "citation_source": true,
+      "error": null
+    },
+    {
+      "id": "seal_d4",
+      "order_lookup": true,
+      "reason_code": true,
+      "policy_route": true,
+      "status": true,
+      "citation_source": true,
+      "error": null
+    }
+  ],
+  "authorization_cases": [
+    {
+      "id": "seal_a1",
+      "endpoint": "search",
+      "blocked": true,
+      "error": null
+    },
+    {
+      "id": "seal_a2",
+      "endpoint": "ask",
+      "blocked": true,
+      "error": null
+    },
+    {
+      "id": "seal_a3",
+      "endpoint": "diagnose",
+      "blocked": true,
+      "error": null
+    }
+  ]
+}

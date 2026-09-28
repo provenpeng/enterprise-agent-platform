@@ -1,0 +1,18 @@
+{
+  "name": "synthetic-enterprise-general-final-gate-v2",
+  "dataset_version": "synthetic-enterprise-general-final-v2",
+  "thresholds": {
+    "retrieval_recall_at_1": 0.7,
+    "retrieval_recall_at_5": 0.9,
+    "retrieval_mrr_at_5": 0.75,
+    "retrieval_no_hit_rate": 1.0,
+    "qa_citation_source_accuracy": 0.9,
+    "qa_abstention_accuracy": 1.0,
+    "diagnostic_order_lookup_accuracy": 1.0,
+    "diagnostic_reason_code_accuracy": 1.0,
+    "diagnostic_policy_route_accuracy": 1.0,
+    "diagnostic_status_accuracy": 1.0,
+    "diagnostic_citation_source_accuracy": 1.0,
+    "tenant_isolation_accuracy": 1.0
+  }
+}

@@ -72,6 +72,8 @@ curl -fsS -H "Authorization: Bearer $TOKEN" \
   "http://127.0.0.1:8000/api/v1/documents/$DOC_ID/index-jobs"
 ```
 
+完整演示语料还包括 [`returns_policy.md`](examples/returns_policy.md)、[`expense_policy.md`](examples/expense_policy.md)、[`procurement_policy.md`](examples/procurement_policy.md)、[`access_control.md`](examples/access_control.md) 和 [`incident_response.md`](examples/incident_response.md)。把六份文档上传到同一知识库，可验证跨业务问答与相似条款辨析；版本化题集及验收结果见[多业务验证记录](docs/GENERALIZATION_VALIDATION.md)。
+
 索引任务显示 `SUCCEEDED` 后运行：
 
 ```bash
@@ -121,7 +123,7 @@ alembic check
 pytest -q
 ```
 
-CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像。测试使用确定性的假模型；[版本化 RAG 与 Agent 基准](docs/AGENT_TRACES_EVAL.md)可在显式启动模型后生成可比较的检索、引用、拒答和跨租户报告。另有冻结的留出集与逐指标质量门槛。有界词项重排后，DeepSeek 的留出集检索已达到 7/7，但问答精确来源仍为 5/6，未通过预设门槛；逐例结果与限制见评测文档。合成数据集不能代表真实业务质量。
+CI 在 pgvector PostgreSQL 上执行迁移、迁移漂移检查、静态检查、格式检查和数据库集成测试，同时构建后端镜像，并通过 Chromium 检查工作台登录、上传、索引状态、问答、诊断及刷新后恢复。测试使用确定性的假模型和浏览器 API 模拟；[版本化 RAG 与 Agent 基准](docs/AGENT_TRACES_EVAL.md)可在显式启动模型后生成可比较的检索、引用、拒答和跨租户报告。旧三短文档留出集曾只有 5/6 精确引用；新增的独立多业务长文档验收集达到 15/15 精确引用，详情见[逐例结果和事实支撑复核](docs/GENERALIZATION_VALIDATION.md)。合成数据集不能代表真实业务质量。
 
 前端检查使用 `cd frontend && npm run typecheck && npm run lint && npm run test && npm run build`。`backend/scripts/export_openapi.py` 导出后端契约，`npm run generate:api` 更新 TypeScript 类型；CI 检查两个生成文件与后端路由一致。
 

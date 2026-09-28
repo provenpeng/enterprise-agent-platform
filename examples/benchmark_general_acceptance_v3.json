@@ -1,0 +1,608 @@
+{
+  "version": "synthetic-enterprise-general-acceptance-v3",
+  "corpus": [
+    {
+      "filename": "refund_policy.md",
+      "path": "refund_policy.md",
+      "sha256": "ddc4c2e8191980bac9d0000cf860982146041941d7633e9f6b540454c1d63fe8"
+    },
+    {
+      "filename": "returns_policy.md",
+      "path": "returns_policy.md",
+      "sha256": "fac77aadcb6ea09359162ed0a78d03ef76f2437ce561ede8430ebdeef7a827b4"
+    },
+    {
+      "filename": "expense_policy.md",
+      "path": "expense_policy.md",
+      "sha256": "4223a1d6084077b2232aaa0fa625944e5136d6f0b8e3706dcbb78acd3f0377c0"
+    },
+    {
+      "filename": "procurement_policy.md",
+      "path": "procurement_policy.md",
+      "sha256": "b3779a2ae587fff453ed415b8367a8ae51d8a0dd45423416481820ae2422417f"
+    },
+    {
+      "filename": "access_control.md",
+      "path": "access_control.md",
+      "sha256": "d9f7c82542554cd9db102dd7bda77e3464cd2ad3d48594c86d38ac6b1641ad7f"
+    },
+    {
+      "filename": "incident_response.md",
+      "path": "incident_response.md",
+      "sha256": "9ffda20d4eb2caf951b4d8094252f9ca35efc8bd6eba79a69b893d60df78a4d8"
+    }
+  ],
+  "sources": {
+    "refund_window": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "申请资格与时限"
+      ]
+    },
+    "refund_balance": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "金额与余额校验"
+      ]
+    },
+    "refund_approval": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "审批与处理时限"
+      ]
+    },
+    "refund_exclusion": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "不可退款与例外"
+      ]
+    },
+    "refund_window_error": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "异常原因代码与处置",
+        "REFUND_WINDOW_EXPIRED"
+      ]
+    },
+    "refund_amount_error": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "异常原因代码与处置",
+        "AMOUNT_EXCEEDS_REFUNDABLE"
+      ]
+    },
+    "refund_gateway_error": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "异常原因代码与处置",
+        "GATEWAY_TIMEOUT"
+      ]
+    },
+    "refund_archive": {
+      "filename": "refund_policy.md",
+      "section_path": [
+        "客户退款与资金处理作业规范",
+        "对账、告知与留档"
+      ]
+    },
+    "return_window": {
+      "filename": "returns_policy.md",
+      "section_path": [
+        "商品退货与换货作业规范",
+        "退货申请期限"
+      ]
+    },
+    "return_inspection": {
+      "filename": "returns_policy.md",
+      "section_path": [
+        "商品退货与换货作业规范",
+        "商品验收"
+      ]
+    },
+    "return_exchange": {
+      "filename": "returns_policy.md",
+      "section_path": [
+        "商品退货与换货作业规范",
+        "换货条件与库存"
+      ]
+    },
+    "return_shipping": {
+      "filename": "returns_policy.md",
+      "section_path": [
+        "商品退货与换货作业规范",
+        "物流费用归属"
+      ]
+    },
+    "expense_deadline": {
+      "filename": "expense_policy.md",
+      "section_path": [
+        "员工差旅与费用报销管理办法",
+        "报销提交期限"
+      ]
+    },
+    "expense_invoice": {
+      "filename": "expense_policy.md",
+      "section_path": [
+        "员工差旅与费用报销管理办法",
+        "票据与附件"
+      ]
+    },
+    "expense_approval": {
+      "filename": "expense_policy.md",
+      "section_path": [
+        "员工差旅与费用报销管理办法",
+        "标准与审批责任"
+      ]
+    },
+    "expense_payment": {
+      "filename": "expense_policy.md",
+      "section_path": [
+        "员工差旅与费用报销管理办法",
+        "支付、退回与申诉"
+      ]
+    },
+    "procurement_budget": {
+      "filename": "procurement_policy.md",
+      "section_path": [
+        "供应商准入与采购合同管理规程",
+        "需求与预算立项"
+      ]
+    },
+    "procurement_bid": {
+      "filename": "procurement_policy.md",
+      "section_path": [
+        "供应商准入与采购合同管理规程",
+        "比价与供应商准入"
+      ]
+    },
+    "procurement_security": {
+      "filename": "procurement_policy.md",
+      "section_path": [
+        "供应商准入与采购合同管理规程",
+        "安全评估与数据条款"
+      ]
+    },
+    "procurement_contract": {
+      "filename": "procurement_policy.md",
+      "section_path": [
+        "供应商准入与采购合同管理规程",
+        "合同审批与签署"
+      ]
+    },
+    "procurement_payment": {
+      "filename": "procurement_policy.md",
+      "section_path": [
+        "供应商准入与采购合同管理规程",
+        "验收与付款"
+      ]
+    },
+    "access_approval": {
+      "filename": "access_control.md",
+      "section_path": [
+        "员工与第三方访问控制规范",
+        "权限申请与批准"
+      ]
+    },
+    "access_mfa": {
+      "filename": "access_control.md",
+      "section_path": [
+        "员工与第三方访问控制规范",
+        "多因素认证与会话"
+      ]
+    },
+    "access_vendor": {
+      "filename": "access_control.md",
+      "section_path": [
+        "员工与第三方访问控制规范",
+        "第三方与临时访问"
+      ]
+    },
+    "access_offboard": {
+      "filename": "access_control.md",
+      "section_path": [
+        "员工与第三方访问控制规范",
+        "转岗与离职"
+      ]
+    },
+    "incident_level": {
+      "filename": "incident_response.md",
+      "section_path": [
+        "安全事件分级与通报手册",
+        "分级标准"
+      ]
+    },
+    "incident_response": {
+      "filename": "incident_response.md",
+      "section_path": [
+        "安全事件分级与通报手册",
+        "响应时限与职责"
+      ]
+    },
+    "incident_evidence": {
+      "filename": "incident_response.md",
+      "section_path": [
+        "安全事件分级与通报手册",
+        "遏制与取证"
+      ]
+    },
+    "incident_notice": {
+      "filename": "incident_response.md",
+      "section_path": [
+        "安全事件分级与通报手册",
+        "外部通报与客户沟通"
+      ]
+    },
+    "incident_review": {
+      "filename": "incident_response.md",
+      "section_path": [
+        "安全事件分级与通报手册",
+        "恢复与复盘"
+      ]
+    }
+  },
+  "retrieval": [
+    {
+      "id": "acc_r01",
+      "category": "confusable",
+      "query": "顾客撤销原申请后重新申请退款，时限以哪次申请核定？",
+      "relevant_source_ids": [
+        "refund_window"
+      ]
+    },
+    {
+      "id": "acc_r02",
+      "category": "paraphrase",
+      "query": "退款处理中但还没失败的金额，会占用余额吗？",
+      "relevant_source_ids": [
+        "refund_balance"
+      ]
+    },
+    {
+      "id": "acc_r03",
+      "category": "direct",
+      "query": "批量退款除了运营主管还要谁复核？",
+      "relevant_source_ids": [
+        "refund_approval"
+      ]
+    },
+    {
+      "id": "acc_r04",
+      "category": "paraphrase",
+      "query": "退款渠道状态未知时为何不能直接再次付款？",
+      "relevant_source_ids": [
+        "refund_gateway_error"
+      ]
+    },
+    {
+      "id": "acc_r05",
+      "category": "confusable",
+      "query": "客户按时申请退货，但寄回物流卡住会被直接拒绝吗？",
+      "relevant_source_ids": [
+        "return_window"
+      ]
+    },
+    {
+      "id": "acc_r06",
+      "category": "direct",
+      "query": "普通无理由退货的寄回运费谁付？",
+      "relevant_source_ids": [
+        "return_shipping"
+      ]
+    },
+    {
+      "id": "acc_r07",
+      "category": "paraphrase",
+      "query": "已寄回设备带有个人数据，仓库可以直接再次销售吗？",
+      "relevant_source_ids": [
+        "return_inspection"
+      ]
+    },
+    {
+      "id": "acc_r08",
+      "category": "confusable",
+      "query": "出差结束跨月后，报销截止日期怎么算？",
+      "relevant_source_ids": [
+        "expense_deadline"
+      ]
+    },
+    {
+      "id": "acc_r09",
+      "category": "direct",
+      "query": "财务退回报销单时应说明什么？",
+      "relevant_source_ids": [
+        "expense_payment"
+      ]
+    },
+    {
+      "id": "acc_r10",
+      "category": "paraphrase",
+      "query": "采购为何不能只按软件首月价格确定审批级别？",
+      "relevant_source_ids": [
+        "procurement_budget"
+      ]
+    },
+    {
+      "id": "acc_r11",
+      "category": "direct",
+      "query": "合同偏离标准条款时由谁审核？",
+      "relevant_source_ids": [
+        "procurement_contract"
+      ]
+    },
+    {
+      "id": "acc_r12",
+      "category": "confusable",
+      "query": "供应商已经通过采购准入，能直接处理客户数据吗？",
+      "relevant_source_ids": [
+        "procurement_security"
+      ]
+    },
+    {
+      "id": "acc_r13",
+      "category": "direct",
+      "query": "生产系统管理员权限默认最长授权多久？",
+      "relevant_source_ids": [
+        "access_approval"
+      ]
+    },
+    {
+      "id": "acc_r14",
+      "category": "confusable",
+      "query": "外包人员合同结束后的账号还能暂时继续用吗？",
+      "relevant_source_ids": [
+        "access_offboard"
+      ]
+    },
+    {
+      "id": "acc_r15",
+      "category": "paraphrase",
+      "query": "出现单一关键系统被入侵属于哪级事件？",
+      "relevant_source_ids": [
+        "incident_level"
+      ]
+    },
+    {
+      "id": "acc_r16",
+      "category": "direct",
+      "query": "一级二级事件恢复后初步复盘须在多少工作日内完成？",
+      "relevant_source_ids": [
+        "incident_review"
+      ]
+    },
+    {
+      "id": "acc_r17",
+      "category": "paraphrase",
+      "query": "安全事件隔离账号前应记录什么和保留哪些日志？",
+      "relevant_source_ids": [
+        "incident_evidence"
+      ]
+    },
+    {
+      "id": "acc_r18",
+      "category": "no_answer",
+      "query": "员工股票购买折扣比例是多少？",
+      "relevant_source_ids": [],
+      "expect_no_hits": true,
+      "min_score": 0.8
+    },
+    {
+      "id": "acc_r19",
+      "category": "no_answer",
+      "query": "公司员工宿舍有多少床位？",
+      "relevant_source_ids": [],
+      "expect_no_hits": true,
+      "min_score": 0.8
+    },
+    {
+      "id": "acc_r20",
+      "category": "no_answer",
+      "query": "海外分公司食堂在哪里？",
+      "relevant_source_ids": [],
+      "expect_no_hits": true,
+      "min_score": 0.8
+    }
+  ],
+  "qa": [
+    {
+      "id": "acc_q01",
+      "query": "退款申请被撤回后重新提交，系统按什么时间判断是否在三十天内？",
+      "required_source_ids": [
+        "refund_window"
+      ]
+    },
+    {
+      "id": "acc_q02",
+      "query": "退款申请金额如何扣除已经退回和仍在处理的金额？",
+      "required_source_ids": [
+        "refund_balance"
+      ]
+    },
+    {
+      "id": "acc_q03",
+      "query": "客户申请批量退款，业务审批和财务复核分别由谁负责？",
+      "required_source_ids": [
+        "refund_approval"
+      ]
+    },
+    {
+      "id": "acc_q04",
+      "query": "普通退货的包裹已交寄却长时间没有物流更新，应怎么处理？",
+      "required_source_ids": [
+        "return_window"
+      ]
+    },
+    {
+      "id": "acc_q05",
+      "query": "质量缺陷确认后寄回运费由谁承担？",
+      "required_source_ids": [
+        "return_shipping"
+      ]
+    },
+    {
+      "id": "acc_q06",
+      "query": "员工出差结束跨月，报销的三十天从哪一天算？",
+      "required_source_ids": [
+        "expense_deadline"
+      ]
+    },
+    {
+      "id": "acc_q07",
+      "query": "普通城市和一线城市的住宿每晚上限分别多少？",
+      "required_source_ids": [
+        "expense_approval"
+      ]
+    },
+    {
+      "id": "acc_q08",
+      "query": "采购年度总成本达到十万元但只有两家有效报价，应该怎么留痕？",
+      "required_source_ids": [
+        "procurement_bid"
+      ]
+    },
+    {
+      "id": "acc_q09",
+      "query": "采购合同偏离模板条款应由谁审核，变更履约范围用什么文件？",
+      "required_source_ids": [
+        "procurement_contract"
+      ]
+    },
+    {
+      "id": "acc_q10",
+      "query": "新供应商要接收客户个人信息，签约前由谁评估哪些安全措施？",
+      "required_source_ids": [
+        "procurement_security"
+      ]
+    },
+    {
+      "id": "acc_q11",
+      "query": "管理员角色与普通角色默认最长授权期各是多少？",
+      "required_source_ids": [
+        "access_approval"
+      ]
+    },
+    {
+      "id": "acc_q12",
+      "query": "第三方合同结束后，账号能以预计续签为由保留吗？",
+      "required_source_ids": [
+        "access_offboard"
+      ]
+    },
+    {
+      "id": "acc_q13",
+      "query": "单一关键系统被入侵应如何初始分级，证据变化后可以调整吗？",
+      "required_source_ids": [
+        "incident_level"
+      ]
+    },
+    {
+      "id": "acc_q14",
+      "query": "一级和二级安全事件的内部通知时限各是多少？",
+      "required_source_ids": [
+        "incident_response"
+      ]
+    },
+    {
+      "id": "acc_q15",
+      "query": "客户退款审批通过后与员工报销审批结束后，各自多久提交资金处理？",
+      "required_source_ids": [
+        "refund_approval",
+        "expense_payment"
+      ]
+    },
+    {
+      "id": "acc_q16",
+      "query": "生产管理员权限的默认期限和第三方紧急临时权限的最长时长分别是什么？",
+      "required_source_ids": [
+        "access_approval",
+        "access_vendor"
+      ]
+    },
+    {
+      "id": "acc_q17",
+      "query": "员工股票购买折扣是多少？",
+      "required_source_ids": [],
+      "expect_abstain": true
+    },
+    {
+      "id": "acc_q18",
+      "query": "公司食堂周末开放到几点？",
+      "required_source_ids": [],
+      "expect_abstain": true
+    },
+    {
+      "id": "acc_q19",
+      "query": "员工宿舍押金金额是多少？",
+      "required_source_ids": [],
+      "expect_abstain": true
+    }
+  ],
+  "diagnostic": [
+    {
+      "id": "acc_d1",
+      "question": "DEMO-WINDOW 的失败记录对应哪条申请时限核查规则？",
+      "order_id": "DEMO-WINDOW",
+      "expected_reason_code": "REFUND_WINDOW_EXPIRED",
+      "expect_policy_search": true,
+      "expected_status": "ANSWERED",
+      "required_source_ids": [
+        "refund_window_error"
+      ]
+    },
+    {
+      "id": "acc_d2",
+      "question": "DEMO-AMOUNT 的可退金额核对步骤是什么？",
+      "order_id": "DEMO-AMOUNT",
+      "expected_reason_code": "AMOUNT_EXCEEDS_REFUNDABLE",
+      "expect_policy_search": true,
+      "expected_status": "ANSWERED",
+      "required_source_ids": [
+        "refund_amount_error"
+      ]
+    },
+    {
+      "id": "acc_d3",
+      "question": "DEMO-GATEWAY 的最新失败代码意味着什么，下一步先查哪里？",
+      "order_id": "DEMO-GATEWAY",
+      "expected_reason_code": "GATEWAY_TIMEOUT",
+      "expect_policy_search": true,
+      "expected_status": "ANSWERED",
+      "required_source_ids": [
+        "refund_gateway_error"
+      ]
+    },
+    {
+      "id": "acc_d4",
+      "question": "查询 DEMO-SUCCESS 当前退款是否已完成。",
+      "order_id": "DEMO-SUCCESS",
+      "expected_reason_code": null,
+      "expect_policy_search": false,
+      "expected_status": "BUSINESS_FACTS_ONLY",
+      "required_source_ids": []
+    }
+  ],
+  "authorization": [
+    {
+      "id": "acc_a1",
+      "endpoint": "search",
+      "query": "安全事件复盘何时完成？"
+    },
+    {
+      "id": "acc_a2",
+      "endpoint": "ask",
+      "query": "员工报销单逾期后是否自动拒付？"
+    },
+    {
+      "id": "acc_a3",
+      "endpoint": "diagnose",
+      "query": "DEMO-GATEWAY 的失败代码是什么？",
+      "order_id": "DEMO-GATEWAY"
+    }
+  ]
+}

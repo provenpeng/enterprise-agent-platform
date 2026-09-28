@@ -21,7 +21,12 @@ from app.rag.answer_generator import AnswerDraft
 from app.rag.embeddings import EMBEDDING_DIMENSIONS
 from app.schemas.answer import AskResponse
 from app.schemas.retrieval import SearchHit
-from app.services.answer import NO_ANSWER, stream_answer
+from app.services.answer import (
+    NO_ANSWER,
+    _diversify_hits,
+    _response_for_draft,
+    stream_answer,
+)
 from app.services.conversations import append_verified_turn
 from app.services.errors import NotFound
 
@@ -72,6 +77,63 @@ class FixedStreamingGenerator(FixedGenerator):
         yield self.draft or AnswerDraft(
             answer="需要经理批准。", cited_chunk_ids=[str(hits[0].chunk_id)]
         )
+
+
+def test_absence_explanation_cannot_cite_an_adjacent_policy() -> None:
+    knowledge_base_id = uuid.uuid4()
+    chunk_id = uuid.uuid4()
+    hit = SearchHit(
+        chunk_id=chunk_id,
+        document_id=uuid.uuid4(),
+        document_name="expense.md",
+        index_version=1,
+        chunk_index=0,
+        content="国内差旅住宿标准每晚 500 元。",
+        score=0.7,
+        page_number=None,
+        section_title="国内差旅",
+        section_path=["费用报销", "国内差旅"],
+    )
+    absent = _response_for_draft(
+        knowledge_base_id,
+        AnswerDraft(
+            answer="提供的证据中没有海外办公补贴标准。",
+            cited_chunk_ids=[str(chunk_id)],
+        ),
+        [hit],
+    )
+    assert absent.answer == NO_ANSWER
+    assert not absent.grounded and absent.citations == []
+    direct = _response_for_draft(
+        knowledge_base_id,
+        AnswerDraft(answer="没有发票不能报销。", cited_chunk_ids=[str(chunk_id)]),
+        [hit],
+    )
+    assert direct.grounded
+
+
+def test_answer_evidence_keeps_a_second_document_in_a_crowded_ranking() -> None:
+    dominant = uuid.uuid4()
+    second = uuid.uuid4()
+
+    def hit(document_id: uuid.UUID, index: int) -> SearchHit:
+        return SearchHit(
+            chunk_id=uuid.uuid4(),
+            document_id=document_id,
+            document_name="policy.md",
+            index_version=1,
+            chunk_index=index,
+            content="rule",
+            score=0.7,
+            page_number=None,
+            section_title=None,
+            section_path=["policy"],
+        )
+
+    ranked = [hit(dominant, index) for index in range(9)] + [hit(second, 9)]
+    selected = _diversify_hits(ranked, 5)
+    assert len(selected) == 5
+    assert selected[-1].document_id == second
 
 
 def parse_sse(body: str) -> list[tuple[str, dict]]:

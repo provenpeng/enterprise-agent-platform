@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from typing import TypedDict
 
+import tiktoken
 from langchain_core.embeddings import Embeddings
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -162,8 +163,16 @@ class DiagnosticWorkflow:
                 "latest_reason_code": latest_attempt.reason_code
                 if latest_attempt
                 else None,
+                "order_snapshot": order.model_dump(mode="json"),
             }
-            return {"order": order}
+            # A recorded failed reason code is stronger routing evidence than
+            # the planner's guess about whether policy lookup is needed.
+            search_policy = state["search_policy"] or bool(
+                latest_attempt
+                and latest_attempt.status.value == "FAILED"
+                and latest_attempt.reason_code
+            )
+            return {"order": order, "search_policy": search_policy}
 
     async def _retrieve(self, state: DiagnosticState) -> DiagnosticState:
         order = state["order"]
@@ -172,6 +181,12 @@ class DiagnosticWorkflow:
         )
         query = f"{state['question']} {latest_reason or ''}".strip()
         async with self._recorder.step("retrieve_policy", {"query": query}) as trace:
+            trace.output = {
+                "embedding_query_token_estimate": len(
+                    tiktoken.get_encoding("cl100k_base").encode(query)
+                ),
+                "embedding_tokenizer": "cl100k_base",
+            }
             hits = await search_knowledge_base(
                 self._db,
                 self._embeddings,
@@ -186,17 +201,18 @@ class DiagnosticWorkflow:
                 timeout_seconds=self._options.embedding_timeout_seconds,
                 required_term=latest_reason,
             )
-            trace.output = {
-                "hits": [
-                    {
-                        "chunk_id": str(hit.chunk_id),
-                        "document_id": str(hit.document_id),
-                        "index_version": hit.index_version,
-                        "score": hit.score,
-                    }
-                    for hit in hits
-                ]
-            }
+            trace.output["hits"] = [
+                {
+                    "chunk_id": str(hit.chunk_id),
+                    "document_id": str(hit.document_id),
+                    "index_version": hit.index_version,
+                    "score": hit.score,
+                    "document_name": hit.document_name,
+                    "section_path": hit.section_path,
+                    "content": hit.content,
+                }
+                for hit in hits
+            ]
             return {"hits": hits}
 
     async def _compose(self, state: DiagnosticState) -> DiagnosticState:

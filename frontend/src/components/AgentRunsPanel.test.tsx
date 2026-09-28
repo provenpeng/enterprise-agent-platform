@@ -19,6 +19,7 @@ const summary: AgentRunSummary = {
 };
 const detail: AgentRunDetail = {
   ...summary,
+  response_data: null,
   steps: [{ sequence: 1, name: "plan", input_data: { question_present: true },
     output_data: { route: "lookup_order" }, error_code: null, input_tokens: 10,
     output_tokens: 5, total_tokens: 15, duration_ms: 120, created_at: "2026-01-01T00:00:00Z" }],
@@ -44,6 +45,6 @@ it("opens an admin run and renders the recorded steps", async () => {
   );
   await waitFor(() => expect(screen.getByText(/规划路由/)).toBeTruthy());
   expect(screen.getByText("deepseek-chat")).toBeTruthy();
-  expect(screen.getByText("输出摘要")).toBeTruthy();
+  expect(screen.getByText("步骤输出与证据快照")).toBeTruthy();
   expect(getAgentRun).toHaveBeenCalledExactlyOnceWith("token", "run-1");
 });

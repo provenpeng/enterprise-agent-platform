@@ -155,13 +155,39 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     ]
     assert trace["steps"][1]["output_data"]["order_id"] == "DEMO-WINDOW"
     assert trace["steps"][2]["output_data"]["hits"][0]["chunk_id"] == str(chunk_id)
-    assert "content" not in trace["steps"][2]["output_data"]["hits"][0]
+    assert trace["steps"][2]["output_data"]["embedding_query_token_estimate"] > 0
+    assert trace["steps"][2]["output_data"]["embedding_tokenizer"] == "cl100k_base"
+    assert (
+        trace["steps"][2]["output_data"]["hits"][0]["content"]
+        == "支付后 30 天内可申请退款。"
+    )
+    assert (
+        trace["steps"][1]["output_data"]["order_snapshot"]["order_id"] == "DEMO-WINDOW"
+    )
+    assert trace["response_data"]["citations"][0]["source"]["chunk_id"] == str(chunk_id)
     assert "answer" not in trace["steps"][3]["output_data"]
     assert trace["steps"][3]["total_tokens"] is None
     assert trace["steps"][3]["output_data"]["composition"] == "reason_code_evidence"
     assert (
         await client.get(f"/api/v1/agent-runs/{body['run_id']}", headers=viewer)
     ).status_code == 403
+    mine = await client.get(
+        f"/api/v1/agent-runs/mine?knowledge_base_id={knowledge_base_id}",
+        headers=viewer,
+    )
+    assert [item["id"] for item in mine.json()] == [body["run_id"]]
+    restored = await client.get(
+        f"/api/v1/agent-runs/mine/{body['run_id']}?knowledge_base_id={knowledge_base_id}",
+        headers=viewer,
+    )
+    assert restored.json()["response"] == body
+    colleague = {"Authorization": f"Bearer {make_token('colleague', role='viewer')}"}
+    assert (
+        await client.get(
+            f"/api/v1/agent-runs/mine/{body['run_id']}?knowledge_base_id={knowledge_base_id}",
+            headers=colleague,
+        )
+    ).status_code == 404
     assert len((await client.get("/api/v1/agent-runs?limit=1")).json()) == 1
     other_tenant = uuid.uuid4()
     async with sessions() as db:
@@ -237,6 +263,13 @@ async def test_diagnostic_short_circuits_missing_order_and_status_only(api_clien
     assert len(exact_policy.json()["citations"]) == 1
     assert embeddings.calls == 1
     assert model.explain_calls == 0
+
+    model.search_policy = False
+    forced_policy = await client.post(
+        path, json={"question": "DEMO-WINDOW 的失败代码对应什么规则？"}
+    )
+    assert forced_policy.json()["status"] == "ANSWERED"
+    assert len(forced_policy.json()["citations"]) == 1
 
 
 @pytest.mark.asyncio

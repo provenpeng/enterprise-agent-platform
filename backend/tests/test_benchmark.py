@@ -28,6 +28,11 @@ from app.services.indexer import process_one_index_job
 DATASET = Path(__file__).resolve().parents[1] / "evals" / "benchmark_v1.json"
 HOLDOUT = DATASET.with_name("benchmark_holdout_v1.json")
 HOLDOUT_GATE = DATASET.with_name("holdout_quality_gate_v1.json")
+GENERAL_DEV = DATASET.parents[2] / "examples" / "benchmark_general_dev_v1.json"
+GENERAL_HOLDOUT = GENERAL_DEV.with_name("benchmark_general_holdout_v1.json")
+GENERAL_GATE = GENERAL_DEV.with_name("general_holdout_quality_gate_v1.json")
+GENERAL_SEALED = GENERAL_DEV.with_name("benchmark_general_sealed_v4.json")
+GENERAL_SEALED_GATE = GENERAL_DEV.with_name("general_sealed_quality_gate_v4.json")
 SPACE_ID = "a" * 64
 
 
@@ -87,6 +92,94 @@ def test_holdout_reuses_frozen_corpus_with_unseen_cases_and_explicit_gate(
     path.write_text(json.dumps(invalid), encoding="utf-8")
     with pytest.raises(ValueError, match="nonzero threshold"):
         load_quality_profile(path, holdout.version)
+
+
+def test_general_corpus_is_long_multidomain_and_has_independent_holdout() -> None:
+    dev, _ = load_benchmark(GENERAL_DEV)
+    holdout, _ = load_benchmark(GENERAL_HOLDOUT)
+    profile, _ = load_quality_profile(GENERAL_GATE, holdout.version)
+    assert len(dev.corpus) == len(holdout.corpus) == 6
+    assert {item.filename for item in dev.corpus} == {
+        "refund_policy.md",
+        "returns_policy.md",
+        "expense_policy.md",
+        "procurement_policy.md",
+        "access_control.md",
+        "incident_response.md",
+    }
+    assert all(
+        path.stat().st_size >= 3000 for _, path in corpus_files(GENERAL_DEV, dev)
+    )
+    assert len(holdout.qa) >= 15
+    assert profile.thresholds["qa_citation_source_accuracy"] >= 0.9
+    for category in ("retrieval", "qa", "diagnostic", "authorization"):
+        dev_cases = getattr(dev, category)
+        holdout_cases = getattr(holdout, category)
+        assert {case.id for case in dev_cases}.isdisjoint(
+            {case.id for case in holdout_cases}
+        )
+        assert {
+            getattr(case, "query", getattr(case, "question", None))
+            for case in dev_cases
+        }.isdisjoint(
+            {
+                getattr(case, "query", getattr(case, "question", None))
+                for case in holdout_cases
+            }
+        )
+    encoding = tiktoken.get_encoding("cl100k_base")
+    for backend in ("manual", "langchain"):
+        processor = create_document_processor(
+            backend=backend,
+            file_type="text/markdown",
+            target_tokens=400,
+            max_tokens=600,
+            token_counter=lambda value: len(encoding.encode(value)),
+        )
+        for document, path in corpus_files(GENERAL_HOLDOUT, holdout):
+            observed = {
+                chunk.section_path for chunk in processor.process(path.read_text())
+            }
+            expected = {
+                label.section_path
+                for label in holdout.sources.values()
+                if label.filename == document.filename
+            }
+            assert expected <= observed
+
+
+def test_sealed_acceptance_set_has_new_questions_and_a_frozen_gate() -> None:
+    sealed, _ = load_benchmark(GENERAL_SEALED)
+    profile, _ = load_quality_profile(GENERAL_SEALED_GATE, sealed.version)
+    previous = [
+        load_benchmark(GENERAL_DEV)[0],
+        load_benchmark(GENERAL_HOLDOUT)[0],
+        load_benchmark(GENERAL_DEV.with_name("benchmark_general_final_v2.json"))[0],
+        load_benchmark(GENERAL_DEV.with_name("benchmark_general_acceptance_v3.json"))[
+            0
+        ],
+    ]
+    assert len(sealed.corpus) == 6
+    assert len(sealed.qa) == 18
+    assert len(sealed.retrieval) == 20
+    assert profile.thresholds["qa_citation_source_accuracy"] >= 0.9
+    for earlier in previous:
+        assert sealed.corpus == earlier.corpus
+        for category in ("retrieval", "qa", "diagnostic", "authorization"):
+            sealed_cases = getattr(sealed, category)
+            old_cases = getattr(earlier, category)
+            assert {case.id for case in sealed_cases}.isdisjoint(
+                {case.id for case in old_cases}
+            )
+            assert {
+                getattr(case, "query", getattr(case, "question", None))
+                for case in sealed_cases
+            }.isdisjoint(
+                {
+                    getattr(case, "query", getattr(case, "question", None))
+                    for case in old_cases
+                }
+            )
 
 
 @pytest.mark.parametrize("backend", ["manual", "langchain"])
@@ -276,13 +369,21 @@ class BenchmarkAPI:
                             "expense_invoice"
                             if self.bad_citation and case.id == "qa_refund_window"
                             else source_id
-                        ]
+                        ],
+                        "document_name": "benchmark.md",
+                        "section_path": ["Benchmark"],
+                        "content": "Synthetic evidence",
                     }
                 }
                 for source_id in case.required_source_ids
             ]
             return httpx.Response(
-                200, json={"grounded": not case.expect_abstain, "citations": citations}
+                200,
+                json={
+                    "answer": "Synthetic answer" if citations else "",
+                    "grounded": not case.expect_abstain,
+                    "citations": citations,
+                },
             )
         if path.endswith("/diagnose"):
             query = json.loads(request.content)["question"]

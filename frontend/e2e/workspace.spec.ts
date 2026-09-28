@@ -65,7 +65,7 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
   await page.getByLabel("演示访问令牌").fill("browser-test-token");
   await page.getByRole("button", { name: "连接工作台" }).click();
   await page.getByRole("list", { name: "知识库列表" }).getByRole("listitem").first().click();
-  await page.locator("input[type=file]").setInputFiles({ name: "expense_policy.md", mimeType: "text/markdown", buffer: Buffer.from("# 员工差旅与费用报销管理办法\n\n员工应在出差结束后 30 个自然日内提交报销单。") });
+  await page.locator("input[type=file]").setInputFiles("../examples/expense_policy.md");
   await page.getByRole("button", { name: "上传并索引" }).click();
   await expect(page.getByText("可检索")).toBeVisible();
   await page.getByLabel("向当前知识库提问").fill("出差报销的提交期限？");

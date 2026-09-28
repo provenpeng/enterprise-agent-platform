@@ -278,6 +278,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-runs/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Run Metrics */
+        get: operations["get_agent_run_metrics_api_v1_agent_runs_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-runs/{run_id}": {
         parameters: {
             query?: never;
@@ -431,6 +448,33 @@ export interface components {
             /** Steps */
             steps: components["schemas"]["AgentRunStepRead"][];
         };
+        /** AgentRunMetrics */
+        AgentRunMetrics: {
+            /** Window Hours */
+            window_hours: number;
+            /** Total */
+            total: number;
+            /** Running */
+            running: number;
+            /** Succeeded */
+            succeeded: number;
+            /** Failed */
+            failed: number;
+            /** P50 Duration Ms */
+            p50_duration_ms: number | null;
+            /** P95 Duration Ms */
+            p95_duration_ms: number | null;
+            /** Reported Model Tokens */
+            reported_model_tokens: number;
+            /** Succeeded Without Reported Tokens */
+            succeeded_without_reported_tokens: number;
+            /** Outcomes */
+            outcomes: {
+                [key: string]: number;
+            };
+            /** Steps */
+            steps: components["schemas"]["AgentStepMetrics"][];
+        };
         /**
          * AgentRunStatus
          * @enum {string}
@@ -501,6 +545,17 @@ export interface components {
             started_at: string;
             /** Finished At */
             finished_at: string | null;
+        };
+        /** AgentStepMetrics */
+        AgentStepMetrics: {
+            /** Name */
+            name: string;
+            /** Count */
+            count: number;
+            /** P95 Duration Ms */
+            p95_duration_ms: number | null;
+            /** Reported Model Tokens */
+            reported_model_tokens: number;
         };
         /** AnswerCitation */
         AnswerCitation: {
@@ -1521,6 +1576,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentRunSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_run_metrics_api_v1_agent_runs_metrics_get: {
+        parameters: {
+            query?: {
+                hours?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRunMetrics"];
                 };
             };
             /** @description Validation Error */

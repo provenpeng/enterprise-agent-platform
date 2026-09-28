@@ -49,6 +49,27 @@ class AgentRunDetail(AgentRunSummary):
     steps: list[AgentRunStepRead]
 
 
+class AgentStepMetrics(BaseModel):
+    name: str
+    count: int
+    p95_duration_ms: float | None
+    reported_model_tokens: int
+
+
+class AgentRunMetrics(BaseModel):
+    window_hours: int
+    total: int
+    running: int
+    succeeded: int
+    failed: int
+    p50_duration_ms: float | None
+    p95_duration_ms: float | None
+    reported_model_tokens: int
+    succeeded_without_reported_tokens: int
+    outcomes: dict[str, int]
+    steps: list[AgentStepMetrics]
+
+
 class DiagnosticHistorySummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

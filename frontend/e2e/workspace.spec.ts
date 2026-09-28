@@ -49,6 +49,7 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
     if (path === `/api/v1/agent-runs/mine` && method === "GET") return json(diagnosed ? [{ id: run, question: "DEMO-SUCCESS 的退款状态？", outcome: "BUSINESS_FACTS_ONLY", started_at: now }] : []);
     if (path === `/api/v1/agent-runs/mine/${run}` && method === "GET") return json({ id: run, question: "DEMO-SUCCESS 的退款状态？", outcome: "BUSINESS_FACTS_ONLY", started_at: now, response: diagnosis });
     if (path === "/api/v1/agent-runs" && method === "GET") return json([]);
+    if (path === "/api/v1/agent-runs/metrics" && method === "GET") return json({ window_hours: 24, total: 0, running: 0, succeeded: 0, failed: 0, p50_duration_ms: null, p95_duration_ms: null, reported_model_tokens: 0, succeeded_without_reported_tokens: 0, outcomes: {}, steps: [] });
     if (path === `/api/v1/knowledge-bases/${kb}/conversations` && method === "GET") return json(answered ? [{ id: conversation, title: "出差报销的提交期限？", created_at: now, updated_at: now }] : []);
     if (path === `/api/v1/knowledge-bases/${kb}/conversations/${conversation}` && method === "GET") return json({ id: conversation, title: "出差报销的提交期限？", turns: [{ id: "turn-1", question: "出差报销的提交期限？", answer: answer.answer, grounded: true, citations: [citation], created_at: now }], has_older: false });
     if (path === `/api/v1/knowledge-bases/${kb}/ask/stream` && method === "POST") {

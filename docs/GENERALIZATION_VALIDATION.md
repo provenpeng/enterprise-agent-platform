@@ -63,4 +63,4 @@ backend/.venv/bin/python backend/scripts/export_public_benchmark.py \
   --output docs/evidence/general_sealed_v4.json
 ```
 
-`frontend/e2e/workspace.spec.ts` 在真实 Chromium 中覆盖演示登录、上传、索引状态、流式引用问答、订单诊断及刷新后恢复结果。浏览器测试拦截 API 以获得确定性结果；后端数据库、索引、授权和模型链路由独立的集成测试与上述真实模型验收覆盖。CI 会运行浏览器测试，但不会自动调用付费聊天模型。
+`frontend/e2e/workspace.spec.ts` 在真实 Chromium 中覆盖演示登录、上传、索引状态、流式引用问答、订单诊断及刷新后恢复结果。浏览器测试拦截 API 以获得确定性结果；`backend/tests/test_workspace_flow.py` 在真实 PostgreSQL 上串联身份校验、上传、索引、检索、问答、诊断及结果恢复，模型依赖用确定性替身。上述真实模型验收另行覆盖语义表现。CI 会运行浏览器与数据库链路测试，但不会自动调用付费聊天模型。

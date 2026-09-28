@@ -506,12 +506,14 @@ async def test_embedding_errors_remain_retryable(
 async def test_long_processing_renews_lease(api_client) -> None:
     client, _, sessions, settings = api_client
     await upload_text(client)
-    settings.index_lease_seconds = 1
+    # Leave enough wall-clock headroom for CI scheduler pauses while still
+    # running longer than one full lease.
+    settings.index_lease_seconds = 3
     claim = await claim_index_job(sessions, settings)
     assert claim is not None
 
     await _with_lease_heartbeat(
-        asyncio.sleep(1.5), sessions, claim, settings, DocumentStatus.PARSING
+        asyncio.sleep(3.5), sessions, claim, settings, DocumentStatus.PARSING
     )
     async with sessions() as db:
         job = await db.get(IndexJob, claim.job_id)

@@ -155,6 +155,8 @@ async def test_diagnostic_routes_to_order_and_policy_with_verified_citation(api_
     ]
     assert trace["steps"][1]["output_data"]["order_id"] == "DEMO-WINDOW"
     assert trace["steps"][2]["output_data"]["hits"][0]["chunk_id"] == str(chunk_id)
+    assert trace["steps"][2]["output_data"]["embedding_query_token_estimate"] > 0
+    assert trace["steps"][2]["output_data"]["embedding_tokenizer"] == "cl100k_base"
     assert (
         trace["steps"][2]["output_data"]["hits"][0]["content"]
         == "支付后 30 天内可申请退款。"

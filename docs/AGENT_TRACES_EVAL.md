@@ -10,7 +10,7 @@
 docker compose run --rm migrate python scripts/prune_agent_runs.py --days 30
 ```
 
-命令删除超过指定天数的运行、响应快照及其步骤，包括已中断的 `RUNNING` 记录。数据库不保存 API 密钥或供应商原始异常。`total_tokens` 只汇总聊天模型在结构化响应中报告的 token；供应商未报告时为 `null`，目前不包含 Embedding token，界面对此作了明确标注。
+命令删除超过指定天数的运行、响应快照及其步骤，包括已中断的 `RUNNING` 记录。数据库不保存 API 密钥或供应商原始异常。`total_tokens` 只汇总聊天模型在结构化响应中报告的 token；供应商未报告时为 `null`。`retrieve_policy` 步骤另保存 `cl100k_base` 对查询输入的 token **估算**，不混入模型报告的总数；Embedding 服务未提供实际用量，界面明确区分两者。
 
 ## 轻量演示检查
 

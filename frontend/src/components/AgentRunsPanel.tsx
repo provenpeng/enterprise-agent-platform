@@ -45,6 +45,8 @@ export function AgentRunsPanel({ token, selectedRunId, onSelectRun }: {
     refetchInterval: (query) => query.state.data?.status === "RUNNING" ? 3000 : false,
   });
   const rows = runs.data || [];
+  const estimateValue = detail.data?.steps.find((step) => step.name === "retrieve_policy")?.output_data.embedding_query_token_estimate;
+  const embeddingEstimate = typeof estimateValue === "number" ? estimateValue : null;
   return (
     <div className="runs-stack">
       <Card className="workspace-card" title="运行记录" extra={<Button size="small" onClick={() => void runs.refetch()}>刷新</Button>}>
@@ -87,11 +89,12 @@ export function AgentRunsPanel({ token, selectedRunId, onSelectRun }: {
                 <Descriptions.Item label="模型">{detail.data.model_name}</Descriptions.Item>
                 <Descriptions.Item label="耗时">{detail.data.duration_ms === null ? "—" : `${detail.data.duration_ms} ms`}</Descriptions.Item>
                 <Descriptions.Item label="对话模型 Token 用量">{detail.data.total_tokens ?? "未提供"}</Descriptions.Item>
+                <Descriptions.Item label="检索输入估算 Token">{embeddingEstimate ?? "—"}</Descriptions.Item>
                 {detail.data.error_code && <Descriptions.Item label="错误代码">{detail.data.error_code}</Descriptions.Item>}
               </Descriptions>
               {detail.data.answer && <Typography.Paragraph className="answer-text">{detail.data.answer}</Typography.Paragraph>}
               {detail.data.response_data && <CitationList citations={detail.data.response_data.citations} />}
-              <Typography.Paragraph type="secondary">Token 用量由对话模型返回；Embedding 服务当前不返回 Token 用量。</Typography.Paragraph>
+              <Typography.Paragraph type="secondary">总 Token 为对话模型报告值；检索步骤另展示 cl100k_base 计算的查询输入估算值，Embedding 服务未提供实际用量。</Typography.Paragraph>
               <Timeline className="run-timeline" items={detail.data.steps.map((step) => ({
                 color: step.error_code ? "red" : "green",
                 children: (

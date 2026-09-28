@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-09-28T05:05:04.039852+00:00",
+  "database_version": "16.15 (Debian 16.15-1.pgdg12+2)",
+  "vector_dimensions": 1536,
+  "trials_per_mode": 20,
+  "concurrency": 4,
+  "model_calls": false,
+  "corpus": "synthetic identical short chunks",
+  "results": [
+    {
+      "active_chunks": 1000,
+      "sequential_p50_ms": 16.72,
+      "sequential_p95_ms": 26.0,
+      "concurrent_p50_ms": 34.8,
+      "concurrent_p95_ms": 99.74
+    },
+    {
+      "active_chunks": 5000,
+      "sequential_p50_ms": 48.61,
+      "sequential_p95_ms": 58.47,
+      "concurrent_p50_ms": 74.15,
+      "concurrent_p95_ms": 89.64
+    },
+    {
+      "active_chunks": 20000,
+      "sequential_p50_ms": 233.45,
+      "sequential_p95_ms": 243.17,
+      "concurrent_p50_ms": 320.78,
+      "concurrent_p95_ms": 324.82
+    }
+  ]
+}

@@ -79,7 +79,7 @@ export function DiagnosticPanel({ token, knowledgeBaseId, canViewTrace, onOpenRu
   const runId = result?.run_id;
   return (
     <Card className="workspace-card" title="订单诊断 Agent" extra={<Tag color="purple">LangGraph</Tag>}>
-      <Typography.Paragraph type="secondary">Agent 会读取当前租户的演示订单，检索当前知识库的规则，再给出可核对的结论。</Typography.Paragraph>
+      <Typography.Paragraph type="secondary">Agent 会读取当前租户的订单，检索当前知识库的规则，再给出可核对的结论。</Typography.Paragraph>
       <form onSubmit={submit} className="diagnostic-form">
         <label htmlFor="diagnostic-question" className="field-label">诊断问题</label>
         <Input.TextArea

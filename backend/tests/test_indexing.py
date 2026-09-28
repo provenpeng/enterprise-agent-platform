@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 import pytest
+from conftest import make_token
 from langchain_core.embeddings import Embeddings
 from reportlab.pdfgen import canvas
 from sqlalchemy import func, select
@@ -103,6 +104,132 @@ async def test_upload_enqueues_and_worker_publishes_active_index(api_client) -> 
         assert chunk is not None
         assert len(chunk.embedding) == EMBEDDING_DIMENSIONS
         assert chunk.metadata_["embedding_space_id"] == settings.embedding_space_id
+
+
+@pytest.mark.asyncio
+async def test_replacement_keeps_old_index_until_publish_and_on_failure(
+    api_client,
+) -> None:
+    client, _, sessions, settings = api_client
+    document_id = await upload_text(client, "Replacement")
+    assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    base = f"/api/v1/documents/{document_id}"
+    original = (await client.get(base)).json()
+    knowledge_base_id = original["knowledge_base_id"]
+    app.dependency_overrides[get_query_embeddings] = lambda: FakeEmbeddings()
+
+    replacement = await client.post(
+        f"{base}/replacement",
+        files={
+            "file": (
+                "revised.md",
+                b"# Refunds\n\nFinance signs off refunds.",
+                "text/markdown",
+            )
+        },
+    )
+    assert replacement.status_code == 202, replacement.text
+    assert replacement.json()["replacement_pending"] is True
+    assert replacement.json()["active_index_version"] == 1
+    assert replacement.json()["checksum"] == original["checksum"]
+    assert (await client.get(f"{base}/chunks")).json()[0][
+        "content"
+    ] == "Refunds require approval."
+    search_path = f"/api/v1/knowledge-bases/{knowledge_base_id}/search"
+    before = (await client.post(search_path, json={"query": "refunds"})).json()
+    assert before["hits"][0]["index_version"] == 1
+
+    viewer = {"Authorization": f"Bearer {make_token('test-user', role='viewer')}"}
+    outsider = {"Authorization": f"Bearer {make_token('outsider')}"}
+    assert (
+        await client.post(
+            f"{base}/replacement",
+            headers=viewer,
+            files={"file": ("other.md", b"# Other\n\nOther rule.", "text/markdown")},
+        )
+    ).status_code == 403
+    assert (
+        await client.post(
+            f"{base}/replacement",
+            headers=outsider,
+            files={"file": ("other.md", b"# Other\n\nOther rule.", "text/markdown")},
+        )
+    ).status_code == 404
+
+    assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    published = (await client.get(base)).json()
+    assert published["active_index_version"] == 2
+    assert published["replacement_pending"] is False
+    assert published["filename"] == "revised.md"
+    assert (await client.get(f"{base}/chunks")).json()[0][
+        "content"
+    ] == "Finance signs off refunds."
+    after = (await client.post(search_path, json={"query": "refunds"})).json()
+    assert after["hits"][0]["index_version"] == 2
+    async with sessions() as db:
+        document = await db.get(Document, uuid.UUID(document_id))
+        assert document is not None
+        assert document.archived_storage_uri is not None
+        assert (settings.upload_dir / document.archived_storage_uri).exists()
+
+    failed = await client.post(
+        f"{base}/replacement",
+        files={
+            "file": (
+                "broken.md",
+                b"# Refunds\n\nUnpublished broken rule.",
+                "text/markdown",
+            )
+        },
+    )
+    assert failed.status_code == 202
+    settings.index_max_attempts = 1
+    assert await process_one_index_job(
+        sessions, settings, InvalidRequestEmbeddings(), len
+    )
+    still_published = (await client.get(base)).json()
+    assert still_published["status"] == "FAILED"
+    assert still_published["active_index_version"] == 2
+    assert still_published["replacement_pending"] is True
+    assert (await client.get(f"{base}/chunks")).json()[0][
+        "content"
+    ] == "Finance signs off refunds."
+    assert (await client.post(search_path, json={"query": "refunds"})).json()["hits"][
+        0
+    ]["index_version"] == 2
+    async with sessions() as db:
+        document = await db.get(Document, uuid.UUID(document_id))
+        assert document is not None
+        previous_pending = settings.upload_dir / document.pending_storage_uri
+        oldest_source = settings.upload_dir / document.archived_storage_uri
+        assert previous_pending.exists() and oldest_source.exists()
+
+    retry = await client.post(
+        f"{base}/replacement",
+        files={
+            "file": (
+                "final.md",
+                b"# Refunds\n\nFinal approved refund rule.",
+                "text/markdown",
+            )
+        },
+    )
+    assert retry.status_code == 202
+    assert not previous_pending.exists()
+    assert await process_one_index_job(sessions, settings, FakeEmbeddings(), len)
+    final = (await client.get(base)).json()
+    assert final["active_index_version"] == 4
+    assert final["replacement_pending"] is False
+    assert final["filename"] == "final.md"
+    assert not oldest_source.exists()
+    async with sessions() as db:
+        document = await db.get(Document, uuid.UUID(document_id))
+        assert document is not None
+        current_path = settings.upload_dir / document.storage_uri
+        archived_path = settings.upload_dir / document.archived_storage_uri
+        assert current_path.exists() and archived_path.exists()
+    assert (await client.delete(base)).status_code == 204
+    assert not current_path.exists() and not archived_path.exists()
 
 
 @pytest.mark.asyncio

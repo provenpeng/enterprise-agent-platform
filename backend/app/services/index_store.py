@@ -105,9 +105,9 @@ async def claim_index_job(
                     max_chunks=job.max_chunks,
                     embed_batch_size=job.embed_batch_size,
                     tokenizer_name=job.tokenizer_name,
-                    file_type=document.file_type,
-                    storage_uri=document.storage_uri,
-                    checksum=document.checksum,
+                    file_type=document.pending_file_type or document.file_type,
+                    storage_uri=document.pending_storage_uri or document.storage_uri,
+                    checksum=document.pending_checksum or document.checksum,
                 )
 
 
@@ -142,7 +142,8 @@ async def _publish_index(
     claim: ClaimedJob,
     chunks: list[ChunkCandidate],
     vectors: list[list[float]],
-) -> None:
+) -> str | None:
+    obsolete_source = None
     async with sessions() as db:
         async with db.begin():
             job = await db.get(IndexJob, claim.job_id, with_for_update=True)
@@ -156,6 +157,9 @@ async def _publish_index(
                 raise LeaseLost
             document = await db.get(Document, claim.document_id, with_for_update=True)
             if document is None:
+                raise LeaseLost
+            expected_checksum = document.pending_checksum or document.checksum
+            if claim.checksum != expected_checksum:
                 raise LeaseLost
             await db.execute(
                 delete(Chunk).where(
@@ -197,10 +201,22 @@ async def _publish_index(
                 )
             )
             document.active_index_version = claim.index_version
+            if document.pending_storage_uri is not None:
+                obsolete_source = document.archived_storage_uri
+                document.archived_storage_uri = document.storage_uri
+                document.storage_uri = document.pending_storage_uri
+                document.checksum = document.pending_checksum
+                document.filename = document.pending_filename
+                document.file_type = document.pending_file_type
+                document.pending_storage_uri = None
+                document.pending_checksum = None
+                document.pending_filename = None
+                document.pending_file_type = None
             document.status = DocumentStatus.READY
             job.status = IndexJobStatus.SUCCEEDED
             job.lease_expires_at = None
             job.last_error = None
+    return obsolete_source
 
 
 async def _record_failure(

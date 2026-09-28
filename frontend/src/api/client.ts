@@ -256,3 +256,19 @@ export async function uploadDocument(
   }
   return body as Document;
 }
+
+export async function replaceDocument(token: string, documentId: string, file: File): Promise<Document> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`/api/v1/documents/${encodeURIComponent(documentId)}/replacement`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) throw new ApiError(response.status, detail(body, "无法替换文档"));
+  if (!body || typeof body !== "object" || !("id" in body) || typeof body.id !== "string") {
+    throw new ApiError(502, "服务返回了无效文档信息");
+  }
+  return body as Document;
+}

@@ -41,6 +41,11 @@ class Document(Base):
             "active_index_version IS NULL OR active_index_version > 0",
             name="ck_documents_active_index_version_positive",
         ),
+        CheckConstraint(
+            "(pending_storage_uri IS NULL AND pending_checksum IS NULL AND pending_filename IS NULL AND pending_file_type IS NULL) OR "
+            "(pending_storage_uri IS NOT NULL AND pending_checksum IS NOT NULL AND pending_filename IS NOT NULL AND pending_file_type IS NOT NULL)",
+            name="ck_documents_pending_source_complete",
+        ),
         Index("ix_documents_knowledge_base_id", "knowledge_base_id"),
         UniqueConstraint(
             "knowledge_base_id", "checksum", name="uq_documents_knowledge_base_checksum"
@@ -59,6 +64,11 @@ class Document(Base):
     file_type: Mapped[str] = mapped_column(String(100), nullable=False)
     storage_uri: Mapped[str] = mapped_column(String(2048), nullable=False)
     checksum: Mapped[str] = mapped_column(String(128), nullable=False)
+    pending_storage_uri: Mapped[str | None] = mapped_column(String(2048))
+    pending_checksum: Mapped[str | None] = mapped_column(String(128))
+    pending_filename: Mapped[str | None] = mapped_column(String(255))
+    pending_file_type: Mapped[str | None] = mapped_column(String(100))
+    archived_storage_uri: Mapped[str | None] = mapped_column(String(2048))
     status: Mapped[DocumentStatus] = mapped_column(
         Enum(DocumentStatus, name="document_status"),
         nullable=False,
@@ -80,3 +90,7 @@ class Document(Base):
     index_jobs: Mapped[list["IndexJob"]] = relationship(
         back_populates="document", cascade="all, delete-orphan", passive_deletes=True
     )
+
+    @property
+    def replacement_pending(self) -> bool:
+        return self.pending_storage_uri is not None

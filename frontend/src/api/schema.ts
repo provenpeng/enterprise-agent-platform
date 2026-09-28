@@ -348,6 +348,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{document_id}/replacement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stage Document Replacement */
+        post: operations["stage_document_replacement_api_v1_documents__document_id__replacement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{document_id}/index-jobs": {
         parameters: {
             query?: never;
@@ -596,6 +613,11 @@ export interface components {
             /** Citations */
             citations: components["schemas"]["AnswerCitation"][];
         };
+        /** Body_stage_document_replacement_api_v1_documents__document_id__replacement_post */
+        Body_stage_document_replacement_api_v1_documents__document_id__replacement_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_knowledge_base_document_api_v1_knowledge_bases__knowledge_base_id__documents_post */
         Body_upload_knowledge_base_document_api_v1_knowledge_bases__knowledge_base_id__documents_post: {
             /** File */
@@ -759,6 +781,8 @@ export interface components {
             status: components["schemas"]["DocumentStatus"];
             /** Active Index Version */
             active_index_version: number | null;
+            /** Replacement Pending */
+            replacement_pending: boolean;
             /**
              * Created At
              * Format: date-time
@@ -1768,6 +1792,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stage_document_replacement_api_v1_documents__document_id__replacement_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_stage_document_replacement_api_v1_documents__document_id__replacement_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRead"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -20,7 +20,7 @@ from app.models.index_job import IndexJob
 from app.schemas.chunk import ActiveChunkRead
 from app.schemas.document import DocumentRead
 from app.schemas.index_job import IndexJobRead
-from app.services.document import delete_document, upload_document
+from app.services.document import delete_document, replace_document, upload_document
 from app.services.index_jobs import enqueue_reindex
 
 knowledge_base_documents_router = APIRouter(
@@ -82,6 +82,24 @@ async def remove_document(
 ) -> None:
     require_admin(principal)
     await delete_document(db, document_id, settings, tenant_id=principal.tenant_id)
+
+
+@documents_router.post(
+    "/{document_id}/replacement",
+    response_model=DocumentRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def stage_document_replacement(
+    document_id: uuid.UUID,
+    file: Annotated[UploadFile, File(...)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    principal: Annotated[Principal, Depends(get_principal)],
+) -> Document:
+    require_admin(principal)
+    return await replace_document(
+        db, document_id, file, settings, tenant_id=principal.tenant_id
+    )
 
 
 @documents_router.post(

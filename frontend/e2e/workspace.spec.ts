@@ -30,6 +30,7 @@ const diagnosis = {
 
 test("login, upload, index, cited QA, diagnosis and restore after reload", async ({ page }) => {
   let uploaded = false;
+  let replaced = false;
   let answered = false;
   let diagnosed = false;
   await page.route("**/api/v1/**", async (route) => {
@@ -41,9 +42,10 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
     if (method === "GET" && path === "/api/v1/me") return json({ subject: "browser-user", tenant_id: kb, role: "admin" });
     if (method === "GET" && path === "/api/v1/tenants/current") return json({ id: kb, name: "演示租户", created_at: now });
     if (method === "GET" && path === "/api/v1/knowledge-bases") return json([{ id: kb, tenant_id: kb, name: "综合业务知识库", description: "多业务政策", created_at: now }]);
-    if (path === `/api/v1/knowledge-bases/${kb}/documents` && method === "GET") return json(uploaded ? [{ id: doc, knowledge_base_id: kb, filename: "expense_policy.md", file_type: "text/markdown", status: "READY", active_index_version: 1, checksum: "fixture", created_at: now }] : []);
+    if (path === `/api/v1/knowledge-bases/${kb}/documents` && method === "GET") return json(uploaded ? [{ id: doc, knowledge_base_id: kb, filename: "expense_policy.md", file_type: "text/markdown", status: "READY", active_index_version: replaced ? 2 : 1, replacement_pending: false, checksum: "fixture", created_at: now }] : []);
     if (path === `/api/v1/knowledge-bases/${kb}/documents` && method === "POST") { uploaded = true; return json({ id: doc, filename: "expense_policy.md" }, 201); }
     if (path === `/api/v1/documents/${doc}/chunks` && method === "GET") return json([{ id: source.chunk_id, index_version: 1, chunk_index: 0, content: source.content, token_count: 29, page_number: null, section_title: source.section_title, section_path: source.section_path }]);
+    if (path === `/api/v1/documents/${doc}/replacement` && method === "POST") { replaced = true; return json({ id: doc, replacement_pending: true, active_index_version: 1 }, 202); }
     if (path === `/api/v1/documents/${doc}` && method === "DELETE") { uploaded = false; return route.fulfill({ status: 204, body: "" }); }
     if (path === `/api/v1/knowledge-bases/${kb}/search` && method === "POST") return json({ knowledge_base_id: kb, hits: [source] });
     if (path === `/api/v1/agent-runs/mine` && method === "GET") return json(diagnosed ? [{ id: run, question: "DEMO-SUCCESS 的退款状态？", outcome: "BUSINESS_FACTS_ONLY", started_at: now }] : []);
@@ -75,6 +77,8 @@ test("login, upload, index, cited QA, diagnosis and restore after reload", async
   await page.getByRole("button", { name: "分片" }).click();
   await expect(page.getByText("分片 1")).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.locator(".document-table input[type=file]").setInputFiles("../examples/expense_policy.md");
+  await expect(page.locator(".document-table").getByRole("cell", { name: "2" })).toBeVisible();
   await page.getByRole("tab", { name: "检索调试" }).click();
   await page.getByLabel("检索问题").fill("出差报销的提交期限？");
   await page.getByRole("button", { name: "检索" }).click();
